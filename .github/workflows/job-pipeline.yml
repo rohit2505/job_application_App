@@ -93,10 +93,16 @@ jobs:
       - name: Stage 3 — tailor resume + cover letter
         working-directory: resume_creation_agent
         run: |
+          # --regenerate: output/ is gitignored and never persists between
+          # runs, so resume_agent's own "already done" state would otherwise
+          # skip regenerating a file that doesn't actually exist this run.
+          # filter_agent's scored.json is already new-jobs-only, so this is
+          # safe and not wasted work.
           python3 resume_agent.py \
             --scored ../job_filter_agent/scored.json \
             --min-score "$MIN_SCORE" \
-            --top "$TOP"
+            --top "$TOP" \
+            --regenerate
 
       - name: Stage 4 — auto-apply (Greenhouse only, CAPTCHA-safe)
         working-directory: apply_agent
