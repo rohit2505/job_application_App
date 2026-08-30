@@ -1,0 +1,15 @@
+keys.json
+.env
+**/__pycache__/
+*.pyc
+.venv/
+resume_creation_agent/output/
+job_Search/jobs.json
+job_filter_agent/scored.json
+
+# NOTE: */state/ folders (seen jobs, seen-scored, done, notified) are
+# intentionally NOT ignored — the GitHub Actions workflow commits them back
+# after every run so it knows what it already handled and doesn't re-notify
+# you about the same job twice.
+job_filter_agent/github_token.txt
+.DS_Store

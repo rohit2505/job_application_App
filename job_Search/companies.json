@@ -1,0 +1,6 @@
+{
+  "_comment": "Company ATS board slugs to poll for apply-direct roles. Edit freely. A wrong/renamed slug just 404s and is skipped. Find a slug from the company's careers URL: greenhouse boards.greenhouse.io/<slug>, lever jobs.lever.co/<slug>, ashby jobs.ashbyhq.com/<slug>.",
+  "greenhouse": ["databricks", "stripe", "airbnb", "coinbase", "dropbox"],
+  "lever": ["plaid"],
+  "ashby": ["ramp", "notion", "openai"]
+}

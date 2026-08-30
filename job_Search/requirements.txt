@@ -1,0 +1,4 @@
+# The script uses only the Python standard library for HTTP and email.
+# certifi just supplies an up-to-date CA bundle so TLS verification works
+# reliably across environments (fixes macOS "CERTIFICATE_VERIFY_FAILED").
+certifi>=2024.2.2

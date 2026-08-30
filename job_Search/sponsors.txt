@@ -1,0 +1,284 @@
+# H-1B sponsor employers — the positive company filter keeps ONLY these.
+# Curated list of DIRECT employers that regularly sponsor (no staffing/consulting
+# firms — those are handled by job_filter_agent/staffing_blocklist.txt).
+# Not exhaustive: a small/newer sponsor may be missing. For full coverage, run
+# build_sponsors.py against the USCIS/DOL data (see SETUP_KEYS.md), or use
+# --any-company to skip this filter. Matching ignores corporate suffixes.
+
+# ---------- Big tech / platforms ----------
+Google
+Alphabet
+Amazon
+Amazon Web Services
+AWS
+Microsoft
+Meta
+Apple
+Netflix
+Nvidia
+Intel
+AMD
+IBM
+Oracle
+Salesforce
+Adobe
+Cisco
+Qualcomm
+Broadcom
+VMware
+SAP
+ServiceNow
+Workday
+Intuit
+PayPal
+eBay
+Dell
+Dell Technologies
+HP
+Hewlett Packard Enterprise
+Texas Instruments
+Micron
+Micron Technology
+Applied Materials
+Lam Research
+KLA
+Marvell
+Analog Devices
+Western Digital
+Arista Networks
+Juniper Networks
+Palo Alto Networks
+Fortinet
+CrowdStrike
+Zscaler
+Cloudflare
+Akamai
+Autodesk
+Ansys
+Synopsys
+Cadence
+Cadence Design Systems
+
+# ---------- Consumer internet / SaaS / unicorns ----------
+Uber
+Lyft
+Airbnb
+DoorDash
+Instacart
+Maplebear
+Pinterest
+Snap
+Reddit
+LinkedIn
+Roblox
+Unity
+Unity Technologies
+Zoom
+Dropbox
+Box
+Slack
+Twilio
+Okta
+Atlassian
+GitLab
+GitHub
+HashiCorp
+Elastic
+Datadog
+Splunk
+Confluent
+Cloudera
+MongoDB
+Snowflake
+Databricks
+Palantir
+Palantir Technologies
+Stripe
+Block
+Square
+Coinbase
+Robinhood
+Plaid
+Affirm
+Chime
+Brex
+Ramp
+Gusto
+Notion
+Figma
+Airtable
+Asana
+Miro
+Grammarly
+Discord
+Nextdoor
+Rippling
+Deel
+Scale AI
+OpenAI
+Anthropic
+Cohere
+Nutanix
+Pure Storage
+Rubrik
+Cohesity
+Samsara
+ServiceTitan
+Toast
+DocuSign
+Zuora
+Coupa
+Anaplan
+Sprinklr
+Braze
+Amplitude
+Twitch
+Instabase
+Airbyte
+Fivetran
+dbt Labs
+Astronomer
+Starburst
+Dremio
+ThoughtSpot
+Alteryx
+Teradata
+Informatica
+Collibra
+Monte Carlo
+Databento
+Rippling
+
+# ---------- Finance / fintech / trading ----------
+JPMorgan Chase
+Goldman Sachs
+Morgan Stanley
+Citigroup
+Citi
+Bank of America
+Wells Fargo
+Capital One
+American Express
+US Bank
+PNC
+Charles Schwab
+Fidelity
+Fidelity Investments
+Vanguard
+BlackRock
+State Street
+BNY Mellon
+Bloomberg
+Two Sigma
+Citadel
+Citadel Securities
+Jane Street
+Point72
+Hudson River Trading
+D. E. Shaw
+Millennium
+Jump Trading
+Optiver
+IMC Trading
+Susquehanna International Group
+Visa
+Mastercard
+Discover
+Synchrony
+Fiserv
+FIS
+Global Payments
+Nasdaq
+CME Group
+SoFi
+Marqeta
+Wealthfront
+Betterment
+Plaid
+
+# ---------- Retail / e-commerce / consumer ----------
+Walmart
+Walmart Global Tech
+Target
+Costco
+Home Depot
+Lowe's
+Best Buy
+Nike
+Wayfair
+Chewy
+Etsy
+Shopify
+Nordstrom
+Kroger
+CVS Health
+Walgreens
+Procter and Gamble
+PepsiCo
+Coca-Cola
+
+# ---------- Media / entertainment / telecom / gaming ----------
+Disney
+Walt Disney
+Comcast
+NBCUniversal
+Warner Bros Discovery
+Paramount
+Spotify
+Verizon
+AT&T
+T-Mobile
+Charter Communications
+Electronic Arts
+Activision Blizzard
+Riot Games
+Epic Games
+Take-Two Interactive
+Roku
+Sonos
+
+# ---------- Auto / mobility / industrial ----------
+Tesla
+Rivian
+Lucid Motors
+Ford
+Ford Motor
+General Motors
+Cruise
+Waymo
+Zoox
+Aurora
+Honeywell
+General Electric
+Caterpillar
+John Deere
+Deere
+
+# ---------- Healthcare / pharma / biotech / health-tech ----------
+UnitedHealth Group
+Optum
+Cigna
+Humana
+Elevance Health
+McKesson
+Cardinal Health
+Pfizer
+Moderna
+Johnson and Johnson
+Merck
+AbbVie
+Amgen
+Gilead Sciences
+Genentech
+Regeneron
+Vertex Pharmaceuticals
+Bristol Myers Squibb
+Eli Lilly
+Novartis
+Illumina
+Tempus
+Flatiron Health
+Oscar Health
+Devoted Health
+Cedar
+Rula

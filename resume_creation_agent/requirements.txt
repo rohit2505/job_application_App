@@ -1,0 +1,3 @@
+certifi
+python-docx
+# pypdf   # only if your base resume is a PDF

@@ -1,0 +1,11 @@
+.env
+keys.json
+__pycache__/
+*.pyc
+# personal / transient — never commit these
+resume.md
+resume.txt
+resume.docx
+resume.pdf
+resume_base.md
+jobs.json

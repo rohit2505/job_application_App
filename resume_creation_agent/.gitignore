@@ -1,0 +1,11 @@
+.env
+keys.json
+__pycache__/
+*.pyc
+# generated applications + any resume copies are personal
+output/
+resume.md
+resume.txt
+resume.docx
+resume.pdf
+scored.json

@@ -1,0 +1,43 @@
+{
+  "_README": "Standard answers the apply agent uses to fill application questions automatically — zero human interaction. Fill in the blanks / confirm the guesses. Personal file: it is gitignored and stays on your machine. Both the resume and apply agents read it from the project root.",
+
+  "full_name": "Rohit Nimmakuri",
+  "first_name": "Rohit",
+  "last_name": "Nimmakuri",
+  "email": "rohit.oracleft@gmail.com",
+  "phone": "216-712-2292",
+  "linkedin": "https://www.linkedin.com/in/rohit-nimmakuri-868b22a6/",
+  "github": "",
+  "portfolio_url": "",
+
+  "location_city": "",
+  "location_state": "",
+  "country": "United States",
+
+  "authorized_to_work_us": "Yes",
+  "requires_sponsorship": "Yes",
+  "sponsorship_details": "Will require visa sponsorship now or in the future.",
+  "work_preference": "Remote",
+  "willing_to_relocate": "No",
+
+  "desired_salary": "",
+  "salary_min": "",
+  "notice_period": "2 weeks",
+  "earliest_start_date": "",
+  "years_experience": "12",
+  "current_title": "Senior Data Engineer / Technical Architect",
+  "current_company": "Tata Consultancy Services (client: Bank of America)",
+
+  "how_did_you_hear": "Company website",
+  "why_interested_template": "I'm excited by this role because it combines my 12 years of SQL/data-engineering experience with the modern data stack, and I'm eager to contribute from day one.",
+
+  "gender": "Decline to self-identify",
+  "race_ethnicity": "Decline to self-identify",
+  "veteran_status": "I am not a protected veteran",
+  "disability_status": "Decline to answer",
+
+  "references": "Available upon request",
+  "notice_confirm_authorized": "Yes",
+  "over_18": "Yes",
+  "agree_terms": "Yes"
+}

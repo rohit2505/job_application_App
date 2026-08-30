@@ -1,0 +1,97 @@
+# Staffing / consulting / outsourcing firms to DROP — you want direct-employer FTE,
+# not bodyshops or agencies (even when they say "full time"). Names are matched
+# loosely (corporate suffixes ignored). Claude also flags intermediaries the JD
+# reveals, so this list only needs the well-known repeat offenders.
+# Add/remove freely. Use --allow-staffing to disable this filter entirely.
+
+# --- IT services / consulting / outsourcing (system integrators, bodyshops) ---
+Cognizant
+Infosys
+Tata Consultancy Services
+TCS
+Wipro
+HCL
+HCL Technologies
+Tech Mahindra
+Accenture
+Capgemini
+Deloitte
+LTIMindtree
+Mindtree
+Larsen and Toubro Infotech
+Mphasis
+Virtusa
+Cyient
+Persistent Systems
+Genpact
+Syntel
+NTT Data
+DXC Technology
+Hexaware
+Birlasoft
+Zensar
+Coforge
+UST Global
+EPAM
+Globant
+Thoughtworks
+Slalom
+Publicis Sapient
+Synechron
+Photon
+Infovision
+ProKarma
+Nagarro
+Sonata Software
+Happiest Minds
+Xoriant
+GlobalLogic
+
+# --- Staffing / recruiting agencies (place you at a client) ---
+Robert Half
+TEKsystems
+Insight Global
+Apex Systems
+Motion Recruitment
+Randstad
+Adecco
+Kforce
+Aerotek
+Collabera
+Judge Group
+Modis
+Akkodis
+Experis
+ManpowerGroup
+Kelly Services
+Beacon Hill
+Signature Consultants
+Diverse Lynx
+Mindlance
+ICONMA
+TalentBurst
+Sunrise Systems
+Ampcus
+Compunnel
+Net2Source
+SGA
+Software Guidance and Assistance
+Cybercoders
+Dice
+Harnham
+Averity
+Jobot
+Russell Tobin
+Pyramid Consulting
+Mastech
+Intelliswift
+V2Soft
+Nityo Infotech
+Prodapt
+Iris Software
+US Tech Solutions
+Tekwissen
+Vaco
+Motion Recruitment Partners
+Zolon Tech
+KTek Resourcing

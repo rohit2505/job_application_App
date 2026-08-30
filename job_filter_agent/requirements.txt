@@ -1,0 +1,2 @@
+certifi
+# pypdf   # uncomment only if your resume is a PDF (resume.pdf)
