@@ -11,6 +11,10 @@
 "https://jobicy.com/jobs/151713-cloud-database-infrastructure-engineer": {
 "drop": "no_sponsor_history"
 },
+"https://jobicy.com/jobs/152068-manager-site-reliability-engineering-auth0": {
+"employer_type": "direct",
+"score": 32
+},
 "https://www.adzuna.com/details/5857651478?utm_medium=api&utm_source=ad8b68c8": {
 "drop": "no_sponsor_history"
 },
@@ -41,11 +45,37 @@
 "employer_type": "direct",
 "score": 52
 },
+"https://www.adzuna.com/details/5861831654?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "staffing_blocklist"
+},
+"https://www.adzuna.com/details/5861874611?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "staffing_blocklist"
+},
+"https://www.adzuna.com/details/5861906564?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 72
+},
+"https://www.adzuna.com/details/5861916102?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 82
+},
+"https://www.adzuna.com/details/5861921223?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 82
+},
 "https://www.adzuna.com/details/5861967303?utm_medium=api&utm_source=ad8b68c8": {
 "drop": "no_sponsor_history"
 },
+"https://www.adzuna.com/details/5861968312?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "employer_type:consulting",
+"score": 78
+},
 "https://www.adzuna.com/details/5861972283?utm_medium=api&utm_source=ad8b68c8": {
 "drop": "no_sponsor_history"
+},
+"https://www.adzuna.com/details/5862007906?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 78
 },
 "https://www.adzuna.com/details/5862025643?utm_medium=api&utm_source=ad8b68c8": {
 "drop": "no_sponsor"
@@ -57,6 +87,14 @@
 "https://www.adzuna.com/details/5862029705?utm_medium=api&utm_source=ad8b68c8": {
 "employer_type": "direct",
 "score": 78
+},
+"https://www.adzuna.com/details/5862086547?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 92
+},
+"https://www.adzuna.com/details/5862195688?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 88
 },
 "https://www.adzuna.com/details/5862199502?utm_medium=api&utm_source=ad8b68c8": {
 "drop": "no_sponsor_history"
@@ -166,6 +204,10 @@
 "https://www.adzuna.com/land/ad/5861842905?se=0DzShJWk8RGSAPAZk33PrA&utm_medium=api&utm_source=ad8b68c8&v=DB280D239E3FEADEA1C4AE6D7493591EB8231551": {
 "drop": "no_sponsor_history"
 },
+"https://www.adzuna.com/land/ad/5862002478?se=eiePo7uk8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=A63245C81BA455CEEE5DDD1AB2D9DC15DF84AF94": {
+"employer_type": "direct",
+"score": 78
+},
 "https://www.adzuna.com/land/ad/5862203011?se=6mNee5Wk8RGHPYxeSUhDPQ&utm_medium=api&utm_source=ad8b68c8&v=3AE784B1D8F3FA7B3DB8156D658EB0049CDE52EC": {
 "drop": "no_sponsor_history"
 },
@@ -174,6 +216,10 @@
 },
 "https://www.adzuna.com/land/ad/5862349853?se=6mNee5Wk8RGHPYxeSUhDPQ&utm_medium=api&utm_source=ad8b68c8&v=0C39C27C25A0D26F5B53D045352E5C2014B850F7": {
 "drop": "no_sponsor_history"
+},
+"https://www.adzuna.com/land/ad/5862351546?se=-nk3jbuk8RGcfKYe_cIpvA&utm_medium=api&utm_source=ad8b68c8&v=64390247A9C9EF131BB9AF81F7CF3545C80FC70D": {
+"employer_type": "direct",
+"score": 72
 },
 "https://www.adzuna.com/land/ad/5862351546?se=6mNee5Wk8RGHPYxeSUhDPQ&utm_medium=api&utm_source=ad8b68c8&v=64390247A9C9EF131BB9AF81F7CF3545C80FC70D": {
 "drop": "no_sponsor_history"
