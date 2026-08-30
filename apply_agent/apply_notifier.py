@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 """
-apply_notifier.py — stage 4: notify (WhatsApp) + deliver (email), so you apply
-from your phone. Runs in the cloud (GitHub); your Mac is not involved.
+apply_notifier.py — stage 5: notify (Telegram) + deliver (email) for anything
+auto_apply.py didn't submit for you. Runs in the cloud (GitHub); your Mac is
+not involved.
 
-For each NEW top-scored job it:
-  - EMAILS you the apply link + the tailored resume.docx attached (guaranteed
-    delivery — no WhatsApp window rules).
-  - sends a WhatsApp ping with the apply link (best-effort mobile nudge). If
-    WhatsApp can't reach you (24h window closed), you still have the email, and
-    the agent emails a "reactivate WhatsApp" note.
-
---keepalive mode sends a periodic WhatsApp nudge so you reply and keep the 24h
-window open (schedule it ~every 20h). If that can't deliver, it emails you to
-re-text the bot.
+For each NEW top-scored job not already auto-applied, it:
+  - EMAILS you the apply link + the tailored resume/cover-letter attached
+    (guaranteed delivery, this is the archival record for interview prep).
+  - sends a Telegram ping with the apply link (best-effort mobile nudge).
+    Telegram has no expiring session/window like the old Twilio WhatsApp
+    sandbox did, so there's no keep-alive nudge needed anymore.
 
 Config via master keys.json / .env:
-  TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM (e.g. +14155238886),
-  WHATSAPP_TO (your mobile, +1...), GMAIL_ADDRESS, GMAIL_APP_PASSWORD, DIGEST_TO.
+  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GMAIL_ADDRESS, GMAIL_APP_PASSWORD, DIGEST_TO.
 """
 
 import argparse
@@ -102,45 +98,23 @@ def slug(s, n=40):
     return s[:n] or "job"
 
 
-# ---- Twilio WhatsApp ----
-def _wa(num):
-    num = (num or "").strip()
-    return num if num.startswith("whatsapp:") else f"whatsapp:{num}"
-
-
+# ---- Telegram (replaces the old Twilio WhatsApp sandbox — free, no message
+# limits, no 24h window to keep alive) ----
 def send_whatsapp(body):
-    """Return (ok, detail). ok=False if creds missing or WhatsApp rejected it
-    (e.g. 24h window closed)."""
-    sid, tok = cfg("TWILIO_ACCOUNT_SID"), cfg("TWILIO_AUTH_TOKEN")
-    frm, to = cfg("TWILIO_WHATSAPP_FROM"), cfg("WHATSAPP_TO")
-    if not all([sid, tok, frm, to]):
-        return False, "twilio creds not set"
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
-    data = urllib.parse.urlencode({"From": _wa(frm), "To": _wa(to), "Body": body}).encode()
+    """Name kept for call-site compatibility; sends via Telegram now.
+    Returns (ok, detail)."""
+    token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
+    if not (token and chat_id):
+        return False, "telegram creds not set"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = urllib.parse.urlencode({"chat_id": chat_id, "text": body}).encode()
     req = urllib.request.Request(url, data=data)
-    req.add_header("Authorization", "Basic " + base64.b64encode(f"{sid}:{tok}".encode()).decode())
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
-            msg = json.loads(r.read().decode())
-        msid = msg.get("sid")
+            json.loads(r.read().decode())
+        return True, "sent"
     except Exception as e:
         return False, f"send error: {e}"
-    # poll final status briefly — a freeform message outside the 24h window fails
-    for _ in range(4):
-        time.sleep(4)
-        try:
-            sreq = urllib.request.Request(url.replace("Messages.json", f"Messages/{msid}.json"))
-            sreq.add_header("Authorization", "Basic " + base64.b64encode(f"{sid}:{tok}".encode()).decode())
-            with urllib.request.urlopen(sreq, timeout=TIMEOUT, context=SSL_CTX) as r:
-                st = json.loads(r.read().decode())
-            status = st.get("status")
-            if status in ("delivered", "read", "sent"):
-                return True, status
-            if status in ("failed", "undelivered"):
-                return False, f"{status} ({st.get('error_code')})"
-        except Exception:
-            break
-    return True, "queued"
 
 
 # ---- email ----
@@ -217,18 +191,12 @@ def main():
                     "state/auto_applied_success.json"),
                     help="jobs auto_apply.py already submitted — skip these, no double-notify")
     ap.add_argument("--keepalive", action="store_true",
-                    help="send a WhatsApp keep-alive nudge (schedule ~every 20h)")
+                    help="(legacy no-op) Telegram has no expiring session, unlike the old "
+                         "Twilio WhatsApp sandbox, so there's nothing to keep alive")
     args = ap.parse_args()
 
     if args.keepalive:
-        ok, detail = send_whatsapp("👋 Reply anything to keep your job alerts flowing on WhatsApp. "
-                                   "(No reply needed if you've messaged recently.)")
-        print(f"  [keepalive] whatsapp: {'ok' if ok else 'FAILED'} ({detail})")
-        if not ok:
-            send_email("[Job Agent] Reactivate WhatsApp alerts",
-                       "Your WhatsApp job alerts window looks closed. Open WhatsApp and text the "
-                       "sandbox 'join <code>' (or just reply to the bot) to resume instant alerts. "
-                       "Meanwhile, new matches keep arriving by email.")
+        print("  [keepalive] no-op — Telegram doesn't need this, kept only for compatibility.")
         return
 
     try:
@@ -262,16 +230,16 @@ def main():
                 "record to reference later if you get an interview." if attachments else
                 "No tailored resume/cover letter found — run the resume agent for this job first.")
         emailed = send_email(f"{title} @ {company}", body, attachments)
-        # 2) WhatsApp ping (best-effort)
-        wa_ok, detail = send_whatsapp(f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
+        # 2) Telegram ping (best-effort)
+        tg_ok, detail = send_whatsapp(f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
                                       f"Apply: {link}\n(resume in your email)")
-        if not wa_ok and emailed:
-            print(f"  [whatsapp] not delivered ({detail}) — job is in your email.", file=sys.stderr)
-        if emailed or wa_ok:
+        if not tg_ok and emailed:
+            print(f"  [telegram] not delivered ({detail}) — job is in your email.", file=sys.stderr)
+        if emailed or tg_ok:
             seen.add(jid)
             sent += 1
             print(f"  sent: [{j.get('score')}] {title[:40]} — {company[:22]}  "
-                  f"(email={'y' if emailed else 'n'}, whatsapp={'y' if wa_ok else 'n'})")
+                  f"(email={'y' if emailed else 'n'}, telegram={'y' if tg_ok else 'n'})")
 
     save_seen(args.seen_file, seen)
     print(f"\nNotified {sent} new job(s).")
