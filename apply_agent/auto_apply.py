@@ -258,17 +258,35 @@ LABEL_KEYWORDS = {
 
 
 def resolve_real_url(page, apply_url):
-    """Follow aggregator redirects/click-throughs until we land somewhere real."""
+    """Follow aggregator redirects until we land somewhere real.
+
+    Deliberately does NOT click the aggregator's "Apply" link — those often
+    open in a new tab (target="_blank"), which leaves the original page
+    un-navigated and this whole function silently looking at the wrong page.
+    Instead, read the link's real href and navigate there directly, then
+    settle through Adzuna's own further client-side (JS) redirect hop(s) by
+    polling page.url until it stops changing.
+    """
     page.goto(apply_url, wait_until="networkidle", timeout=45000)
-    # Adzuna-style: click "Apply for this job" once if present, to get past
-    # its own /land/ad/... redirect layer.
     try:
-        link = page.get_by_text("Apply for this job", exact=False).first
-        if link and link.is_visible():
-            with page.expect_navigation(wait_until="networkidle", timeout=45000):
-                link.click()
+        href = page.locator("a:has-text('Apply for this job')").first.get_attribute("href", timeout=5000)
     except Exception:
-        pass
+        href = None
+    if href:
+        page.goto(href, wait_until="networkidle", timeout=45000)
+
+    # Adzuna's /land/ad/... page then JS-redirects again to the real employer
+    # page; wait for that chain to settle before deciding where we ended up.
+    last_url = None
+    for _ in range(5):
+        page.wait_for_timeout(1200)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        if page.url == last_url:
+            break
+        last_url = page.url
     return page.url
 
 
