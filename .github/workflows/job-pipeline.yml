@@ -2,13 +2,19 @@ name: Job Search Pipeline
 
 # Runs the full pipeline in the cloud, on a schedule, so it no longer needs
 # your Mac running. Each run: fetch -> filter/score -> tailor resume+cover
-# letter -> email you the application package (tagged [JobAgent]).
+# letter -> auto-apply (Greenhouse forms only, never on a CAPTCHA-gated one)
+# -> email you anything left over (tagged [JobAgent]) for manual apply.
+#
+# Auto-apply escalates screening questions it can't answer from your resume
+# to Telegram and waits (bounded) for your reply, if TELEGRAM_* secrets are
+# set; without them it just falls back to the manual-email flow for those.
 #
 # One-time setup (see SETUP.md in this folder for the full walkthrough):
 #   1. Push this repo to GitHub (you're doing this part).
 #   2. Add these as repo secrets (Settings -> Secrets and variables -> Actions):
 #        ADZUNA_APP_ID, ADZUNA_APP_KEY, RAPIDAPI_KEY, MUSE_API_KEY,
-#        ANTHROPIC_API_KEY, GMAIL_ADDRESS, GMAIL_APP_PASSWORD, DIGEST_TO
+#        ANTHROPIC_API_KEY, GMAIL_ADDRESS, GMAIL_APP_PASSWORD, DIGEST_TO,
+#        TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (optional, for screening-question escalation)
 #   3. (Optional) adjust the cron schedule below and JOB_QUERY/JOB_LOCATION.
 
 on:
@@ -46,6 +52,7 @@ jobs:
           pip install -r job_filter_agent/requirements.txt
           pip install -r resume_creation_agent/requirements.txt
           pip install -r apply_agent/requirements.txt
+          playwright install --with-deps chromium
 
       - name: Write keys.json from secrets
         run: |
@@ -58,7 +65,9 @@ jobs:
             "ANTHROPIC_API_KEY": "${{ secrets.ANTHROPIC_API_KEY }}",
             "GMAIL_ADDRESS": "${{ secrets.GMAIL_ADDRESS }}",
             "GMAIL_APP_PASSWORD": "${{ secrets.GMAIL_APP_PASSWORD }}",
-            "DIGEST_TO": "${{ secrets.DIGEST_TO }}"
+            "DIGEST_TO": "${{ secrets.DIGEST_TO }}",
+            "TELEGRAM_BOT_TOKEN": "${{ secrets.TELEGRAM_BOT_TOKEN }}",
+            "TELEGRAM_CHAT_ID": "${{ secrets.TELEGRAM_CHAT_ID }}"
           }
           EOF
 
@@ -89,7 +98,17 @@ jobs:
             --min-score "$MIN_SCORE" \
             --top "$TOP"
 
-      - name: Stage 4 — email you the application package
+      - name: Stage 4 — auto-apply (Greenhouse only, CAPTCHA-safe)
+        working-directory: apply_agent
+        run: |
+          python3 auto_apply.py \
+            --scored ../job_filter_agent/scored.json \
+            --resumes ../resume_creation_agent/output \
+            --profile ../profile.json \
+            --min-score "$MIN_SCORE" \
+            --top "$TOP"
+
+      - name: Stage 5 — email you anything not auto-applied
         working-directory: apply_agent
         run: |
           python3 apply_notifier.py \
@@ -103,6 +122,7 @@ jobs:
           git config user.name "job-agent-bot"
           git config user.email "actions@users.noreply.github.com"
           git add job_Search/state job_filter_agent/state \
-                  resume_creation_agent/state apply_agent/state 2>/dev/null || true
+                  resume_creation_agent/state apply_agent/state \
+                  apply_agent/state/applied.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "Job agent run: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push || true

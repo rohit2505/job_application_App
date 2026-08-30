@@ -213,6 +213,9 @@ def main():
     ap.add_argument("--min-score", type=int, default=int(os.environ.get("MIN_SCORE", 75)))
     ap.add_argument("--top", type=int, default=int(os.environ.get("TOP", 10)))
     ap.add_argument("--seen-file", default=os.environ.get("SEEN_FILE", "state/notified.json"))
+    ap.add_argument("--success-file", default=os.environ.get("APPLIED_SUCCESS_FILE",
+                    "state/auto_applied_success.json"),
+                    help="jobs auto_apply.py already submitted — skip these, no double-notify")
     ap.add_argument("--keepalive", action="store_true",
                     help="send a WhatsApp keep-alive nudge (schedule ~every 20h)")
     args = ap.parse_args()
@@ -236,9 +239,12 @@ def main():
                   key=lambda j: j.get("score", 0), reverse=True)[:args.top]
 
     seen = load_seen(args.seen_file)
+    already_applied = load_seen(args.success_file)
     sent = 0
     for j in jobs:
         jid = (j.get("url") or f"{j.get('company')}:{j.get('title')}").strip()
+        if jid in already_applied:
+            continue  # auto_apply.py already submitted this one and emailed you
         if jid in seen:
             continue
         title, company = j.get("title", ""), j.get("company", "")
