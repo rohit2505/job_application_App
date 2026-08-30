@@ -20,7 +20,7 @@ permissions:
   contents: write   # needed to commit state/output back so re-runs don't duplicate
 
 env:
-  JOB_QUERY: "data engineer,analytics engineer,etl developer"
+  JOB_QUERY: "data engineer,analytics engineer,etl developer,data platform engineer,BI engineer,data architect,senior data engineer"
   JOB_LOCATION: "United States"
   WINDOW_MIN: "1440"          # look back 24h since this runs daily
   MIN_SALARY: "160000"
@@ -78,6 +78,7 @@ jobs:
             --jobs ../job_Search/jobs.json \
             --min-score "$MIN_SCORE" \
             --scored-out scored.json \
+            --any-company \
             --no-email
 
       - name: Stage 3 — tailor resume + cover letter
