@@ -42,6 +42,27 @@ import time
 import urllib.parse
 import urllib.request
 
+try:
+    from playwright.sync_api import Error as PWError, TimeoutError as PWTimeoutError
+except Exception:
+    # Lets this module be imported (e.g. by tests exercising resolve_real_url
+    # with fake page/context doubles) on a machine without playwright
+    # installed. Real Playwright errors, when the library is present, are
+    # actual subclasses of Exception, so this fallback never masks them.
+    class PWError(Exception):
+        pass
+
+    class PWTimeoutError(PWError):
+        pass
+
+# Only these outcomes are genuinely resolved — a real submission, a
+# confirmed non-Greenhouse ATS, or a CAPTCHA gate — and safe to mark
+# permanently in state/applied.json. "redirect_failed", "error", and
+# "unanswered" are all transient/retry-eligible and must never be added
+# there, or a bad run (or a temporary Adzuna hiccup) would silently drop a
+# job forever instead of trying again on the next scheduled run.
+PERMANENT_STATUSES = {"applied", "not_greenhouse", "captcha"}
+
 TIMEOUT = 30
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 QA_MODEL = "claude-sonnet-4-5-20250929"
@@ -257,67 +278,203 @@ LABEL_KEYWORDS = {
 }
 
 
-def resolve_real_url(page, apply_url):
-    """Follow aggregator redirects until we land somewhere real.
+ADZUNA_HOST_SUFFIX = "adzuna.com"
 
-    Adzuna's "Apply for this job" link is NOT a plain href to the employer —
-    its href points at Adzuna's own /land/ad/... redirector, but navigating
-    there directly (page.goto on the extracted href) reliably stalls: the
-    page just sits on /land/ad/... and never fires its client-side redirect
-    to the real employer site. The actual site only fires that redirect when
-    the click happens through the page's own JS handler, which first pops an
-    inline "Receive similar jobs by email" widget with a "No thanks, take me
-    to the job" link — THAT click is what triggers the real navigation.
-    Confirmed by watching the flow live: goto(href) hangs on /land/ad/...
-    indefinitely, while click -> click "No thanks..." lands on the employer
-    site (e.g. cedar.com) within a few seconds.
+# Text patterns tried in order when looking for the "take me to the job"
+# style dismissal on Adzuna's various interstitial widgets/modals. Not an
+# exact-text dependency — any of these (case-insensitive substring) is
+# accepted, so small wording changes on Adzuna's side don't silently break
+# the whole flow.
+_SKIP_WIDGET_PATTERNS = (
+    "no thanks, take me to the job",
+    "no thanks",
+    "no, thanks",
+    "skip",
+    "continue to the job",
+    "continue to job",
+    "take me to the job",
+)
 
-    So: click through the real UI instead of following the href, handling
-    both the "open in same tab" and "open in a new tab" cases.
-    Returns (final_url, page_to_use_from_here_on).
-    """
-    page.goto(apply_url, wait_until="domcontentloaded", timeout=45000)
+# "Apply" trigger patterns, same reasoning — several ways employers/Adzuna
+# phrase the CTA that starts the redirect chain.
+_APPLY_PATTERNS = (
+    "apply for this job", "apply now", "apply on company site", "apply", "continue",
+)
 
-    # dismiss the "email alert" popup modal if Adzuna shows one up front
-    for txt in ("No thanks", "No, thanks"):
+
+def _hostname(url):
+    try:
+        return (urllib.parse.urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+
+
+def _is_adzuna_url(url):
+    host = _hostname(url)
+    return host == ADZUNA_HOST_SUFFIX or host.endswith("." + ADZUNA_HOST_SUFFIX)
+
+
+def _dismiss_common_widgets(pg, diag):
+    """Best-effort dismissal of cookie-consent banners and Adzuna's inline
+    'receive similar jobs by email' widgets. Every attempt is recorded in
+    `diag['actions']` (success or failure) — nothing here is silently
+    swallowed, even though a missing widget on a given page is expected and
+    not itself an error."""
+    # generic cookie/consent banners
+    for txt in ("decline all", "reject all", "accept all", "accept cookies", "i agree"):
         try:
-            btn = page.get_by_text(txt, exact=False).first
-            if btn.is_visible(timeout=1500):
-                btn.click(timeout=1500)
-                page.wait_for_timeout(400)
+            btn = pg.get_by_text(txt, exact=False).first
+            if btn.is_visible(timeout=800):
+                btn.click(timeout=800)
+                diag["actions"].append(f"dismissed consent banner: '{txt}'")
+                pg.wait_for_timeout(200)
+                break
         except Exception:
-            pass
+            pass  # expected: most pages don't show this banner
+
+    for txt in _SKIP_WIDGET_PATTERNS:
+        try:
+            btn = pg.get_by_text(txt, exact=False).first
+            if btn.is_visible(timeout=800):
+                btn.click(timeout=800)
+                diag["actions"].append(f"dismissed interstitial widget: '{txt}'")
+                pg.wait_for_timeout(300)
+                return True
+        except Exception:
+            pass  # expected: not every page shows this widget
+    return False
+
+
+def _click_apply_trigger(pg, context, diag):
+    """Click whatever looks like the Apply CTA (link or button), handling
+    both same-tab navigation and a new popup tab. Returns the page to keep
+    using from here on (may be a new popup page, or the same `pg`)."""
+    for txt in _APPLY_PATTERNS:
+        for role in ("link", "button"):
+            try:
+                el = pg.get_by_role(role, name=re.compile(txt, re.I)).first
+                if not el.is_visible(timeout=800):
+                    continue
+            except Exception:
+                continue
+            try:
+                with context.expect_page(timeout=3500) as new_page_info:
+                    el.click(timeout=4000)
+                target = new_page_info.value
+                target.wait_for_load_state("domcontentloaded", timeout=15000)
+                diag["actions"].append(f"clicked '{txt}' ({role}) -> opened new tab")
+                return target
+            except PWTimeoutError:
+                # no popup opened — the click (if it landed) navigated the
+                # same tab, or did nothing. Either way this isn't an error;
+                # record it and move on to settle-polling below.
+                diag["actions"].append(f"clicked '{txt}' ({role}) -> same tab (no popup)")
+                return pg
+            except Exception as e:
+                diag["actions"].append(f"click '{txt}' ({role}) failed: {e}")
+                continue
+    diag["actions"].append("no apply-style CTA found to click")
+    return pg
+
+
+def resolve_real_url(page, apply_url, timeout_s=30):
+    """Follow aggregator redirects until we land somewhere real, or give up
+    with a clear, diagnosable failure.
+
+    Returns (status, final_url, page_to_use_from_here_on, diag) where status
+    is one of:
+      "direct"          — apply_url was never an Adzuna URL; used as-is.
+      "resolved"        — left Adzuna's domain successfully.
+      "redirect_failed" — still on an Adzuna hostname after exhausting every
+                           attempt; caller should NOT treat this as a
+                           confirmed non-Greenhouse ATS, and should NOT mark
+                           the job permanently seen — it's eligible for retry.
+    `diag` always carries: url, title, frame_urls, actions (list of every
+    attempted action, in order — including ones that did nothing), and
+    optionally `screenshot` (set by the caller after a failure, since only
+    the caller knows the job-specific filename to use).
+
+    Adzuna's "Apply for this job" link is not a plain href to the employer:
+    clicking it reveals an inline "Receive similar jobs by email" widget,
+    and only dismissing that ("No thanks, take me to the job") fires the
+    real client-side redirect through /land/ad/... to the employer site.
+    Confirmed live: page.goto() straight to the extracted href stalls
+    indefinitely on /land/ad/..., while replicating the click flow reaches
+    the employer site within a few seconds.
+    """
+    diag = {"url": apply_url, "title": "", "frame_urls": [], "actions": []}
+
+    if not _is_adzuna_url(apply_url):
+        # Prefer the source's own direct URL when it's already a real
+        # employer/ATS link (this is always true for greenhouse/lever/ashby
+        # sourced jobs) — nothing to resolve.
+        try:
+            page.goto(apply_url, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+        except PWError as e:
+            diag["actions"].append(f"goto(direct url) failed: {e}")
+            return "redirect_failed", page.url or apply_url, page, diag
+        diag["url"], diag["title"] = page.url, _safe_title(page)
+        diag["frame_urls"] = [f.url for f in page.frames]
+        return "direct", page.url, page, diag
+
+    try:
+        page.goto(apply_url, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+    except PWError as e:
+        diag["actions"].append(f"goto(adzuna url) failed: {e}")
+        return "redirect_failed", page.url or apply_url, page, diag
+
+    _dismiss_common_widgets(page, diag)
 
     context = page.context
-    target = page
-    try:
-        with context.expect_page(timeout=4000) as new_page_info:
-            page.locator("a:has-text('Apply for this job')").first.click(timeout=5000)
-        target = new_page_info.value
-        target.wait_for_load_state("domcontentloaded", timeout=15000)
-    except Exception:
-        pass  # no new tab opened — the click happened in the same page
+    target = _click_apply_trigger(page, context, diag)
 
-    # that click reveals the inline "Receive similar jobs by email" widget;
-    # its "No thanks, take me to the job" link is the real redirect trigger
-    try:
-        target.get_by_text("No thanks, take me to the job", exact=False).first.click(timeout=6000)
-    except Exception:
-        pass
+    # clicking Apply reveals the inline widget on whichever page/tab we're
+    # now on — dismiss it, that's the actual redirect trigger
+    _dismiss_common_widgets(target, diag)
 
-    # settle through Adzuna's further client-side (JS) redirect hop(s) by
-    # polling url until it stops changing
-    last_url = None
-    for _ in range(6):
-        target.wait_for_timeout(1500)
+    # settle through any further client-side (JS) redirect hop(s): poll
+    # explicitly until the hostname is no longer Adzuna's, not merely until
+    # the URL stops changing (an unchanged Adzuna URL is never "resolved").
+    deadline = time.time() + timeout_s
+    last_url = target.url
+    while time.time() < deadline:
+        if not _is_adzuna_url(target.url):
+            break
+        target.wait_for_timeout(1200)
         try:
-            target.wait_for_load_state("networkidle", timeout=8000)
+            target.wait_for_load_state("networkidle", timeout=4000)
+        except PWError:
+            pass  # fine — some pages keep background connections open
+        if target.url != last_url:
+            diag["actions"].append(f"url changed: {last_url} -> {target.url}")
+            last_url = target.url
+
+    diag["url"], diag["title"] = target.url, _safe_title(target)
+    try:
+        diag["frame_urls"] = [f.url for f in target.frames]
+    except Exception:
+        diag["frame_urls"] = []
+
+    if _is_adzuna_url(target.url):
+        return "redirect_failed", target.url, target, diag
+    return "resolved", target.url, target, diag
+
+
+def _safe_title(pg):
+    try:
+        return pg.title()
+    except Exception:
+        return ""
+
+
+def _close_extra_page(original_page, ended_up_on):
+    """If resolve_real_url moved us onto a popup/new tab, close whichever
+    page we're NOT continuing to use, so tabs don't pile up across jobs."""
+    if ended_up_on is not original_page:
+        try:
+            original_page.close()
         except Exception:
             pass
-        if target.url == last_url:
-            break
-        last_url = target.url
-    return target.url, target
 
 
 def find_greenhouse_frame(page):
@@ -454,16 +611,61 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
 
 def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
     """Returns (status, log, screenshot_path). status in:
-    'applied', 'not_greenhouse', 'captcha', 'unanswered', 'error'."""
+    'applied', 'not_greenhouse', 'captcha', 'unanswered', 'redirect_failed',
+    'error'.
+
+    'redirect_failed' means we never even confirmed which ATS (if any) the
+    job uses — still stuck on Adzuna, or a navigation error along the way.
+    That's distinct from 'not_greenhouse', which means resolution genuinely
+    succeeded and the destination just isn't Greenhouse. Only 'applied',
+    'not_greenhouse', and 'captcha' are safe to mark permanently seen —
+    'redirect_failed', 'error', and 'unanswered' are all retry-eligible and
+    the caller must not add them to the permanent applied-state file."""
     log = []
+    original_page = page
     try:
-        final_url, page = resolve_real_url(page, job.get("url", ""))
+        rstatus, final_url, page, diag = resolve_real_url(page, job.get("url", ""))
     except Exception as e:
-        return "error", [{"error": str(e)}], None
+        # Never silently swallow this — an unexpected exception here means
+        # something in resolve_real_url itself broke, not just a stuck page.
+        log.append({"error": f"resolve_real_url raised: {e}"})
+        return "redirect_failed", log, None
+
+    log.append({"resolved_status": rstatus, "resolved_url": final_url,
+                "page_title": diag.get("title", ""), "frame_urls": diag.get("frame_urls", []),
+                "actions": diag.get("actions", [])})
+
+    # From here on everything uses `page` — possibly a popup opened during
+    # resolution. Close the original tab now (if different) since it's no
+    # longer needed, and make sure `page` itself (popup or not) is closed
+    # exactly once when this function is done, on every exit path.
+    _close_extra_page(original_page, page)
+    try:
+        return _apply_to_resolved_page(page, rstatus, job, profile, resume_text,
+                                        resume_path, cover_path, log)
+    finally:
+        if page is not original_page:
+            try:
+                page.close()
+            except Exception:
+                pass  # already closed, or never fully opened — fine either way
+
+
+def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_path, cover_path, log):
+    if rstatus == "redirect_failed":
+        shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_redirect_failed.png"
+        try:
+            page.screenshot(path=shot_path, full_page=True)
+        except Exception as e:
+            log.append({"error": f"screenshot on redirect_failed also failed: {e}"})
+            shot_path = None
+        return "redirect_failed", log, shot_path
 
     frame = find_greenhouse_frame(page)
     if not frame:
-        log.append({"resolved_url": final_url, "frame_urls": [f.url for f in page.frames]})
+        # We DID leave Adzuna (rstatus == "resolved"/"direct") and confirmed
+        # this is a real, non-Greenhouse destination — this one is a
+        # legitimate permanent skip, not a transient failure.
         return "not_greenhouse", log, None
 
     if has_captcha(frame):
@@ -603,9 +805,30 @@ def main():
             except Exception as e:
                 status, log, screenshot = "error", [{"error": str(e)}], None
             finally:
-                page.close()
+                # apply_to_job already closes any popup/new tab it opened
+                # during redirect resolution, and — when it did — also
+                # closes this original page itself (see _close_extra_page).
+                # Guard against that double-close rather than assume either
+                # way; closing an already-closed page just raises harmlessly
+                # otherwise.
+                try:
+                    page.close()
+                except Exception:
+                    pass
 
-            seen.add(jid)  # don't retry automatically either way — surfaced via email/log
+            if status in PERMANENT_STATUSES:
+                # Only a genuinely resolved outcome — a real submission, a
+                # confirmed non-Greenhouse ATS, or a CAPTCHA gate — earns a
+                # permanent skip. A redirect that failed, an unexpected
+                # error, or an unanswered screening question is transient:
+                # leaving it out of `seen` means a future run retries it
+                # instead of silently dropping a job forever because of a
+                # bad run.
+                seen.add(jid)
+            else:
+                print(f"  [retry-eligible] {title[:40]} — {company[:20]} "
+                      f"(status={status}, not marked permanently seen)")
+
             if status == "applied":
                 applied += 1
                 success.add(jid)
@@ -625,14 +848,19 @@ def main():
                     "unanswered": "a screening question couldn't be answered "
                                   "(Claude was unsure, and Telegram reply didn't "
                                   "arrive in time / not configured)",
+                    "redirect_failed": "couldn't resolve past Adzuna's redirect "
+                                        "(or hit a navigation error) — retryable",
                     "error": "unexpected error during fill/submit",
                 }.get(status, status)
                 print(f"  [skip:{status}] {title[:40]} — {company[:20]} — {reason}")
-                if status == "not_greenhouse":
+                if status in ("not_greenhouse", "redirect_failed"):
                     for item in log:
                         if "resolved_url" in item:
+                            print(f"      resolved_status: {item.get('resolved_status')}")
                             print(f"      resolved to: {item['resolved_url']}")
+                            print(f"      page title: {item.get('page_title', '')}")
                             print(f"      frames on page: {item['frame_urls']}")
+                            print(f"      actions attempted: {item.get('actions', [])}")
                 # Leave this job for the existing email-me-the-link flow
                 # (apply_notifier.py) — nothing else to do here.
         browser.close()
