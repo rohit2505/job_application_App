@@ -35,7 +35,15 @@
 "drop": "employer_type:consulting",
 "score": 72
 },
+"https://www.adzuna.com/land/ad/5863038421?se=wvctOV-l8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=FE561E922DF377F93E98D053CD65398E93F75521": {
+"drop": "employer_type:consulting",
+"score": 45
+},
 "https://www.adzuna.com/land/ad/5863048636?se=ltbECl2l8RGEeLI7Dotn4Q&utm_medium=api&utm_source=ad8b68c8&v=BFC1FE033DA593194DE91D6468A5C3DB223AC95A": {
+"drop": "employer_type:consulting",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863048636?se=wvctOV-l8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=BFC1FE033DA593194DE91D6468A5C3DB223AC95A": {
 "drop": "employer_type:consulting",
 "score": 62
 }
