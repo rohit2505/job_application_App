@@ -24,6 +24,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_apply as aa  # noqa: E402
 
 
+def _no_meta_refresh(url, timeout_s=15):
+    """Test default: no static meta-refresh available, forcing the
+    click-flow fallback path — matches every existing scenario below, which
+    is testing that click-flow logic specifically."""
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # Minimal fakes standing in for the small slice of the Playwright API this
 # module actually touches.
@@ -144,6 +151,13 @@ class FakeContext:
 
 # --------------------------------------------------------------------------- #
 class ResolveRealUrlTests(unittest.TestCase):
+    def setUp(self):
+        self._orig_meta = aa._fetch_meta_refresh_target
+        aa._fetch_meta_refresh_target = _no_meta_refresh
+
+    def tearDown(self):
+        aa._fetch_meta_refresh_target = self._orig_meta
+
     def test_1_direct_non_adzuna_url_used_as_is(self):
         """A greenhouse/lever/ashby-sourced job's URL is already real — no
         click-through dance, no Adzuna handling, just navigate and return."""
@@ -270,6 +284,46 @@ class ChallengePageTests(unittest.TestCase):
         self.assertNotIn("blocked", aa.PERMANENT_STATUSES)
 
 
+class MetaRefreshResolutionTests(unittest.TestCase):
+    """The primary, preferred path: a plain HTTP GET finds Adzuna's static
+    no-JS meta-refresh fallback and we skip the click-flow entirely."""
+
+    def setUp(self):
+        self._orig_meta = aa._fetch_meta_refresh_target
+
+    def tearDown(self):
+        aa._fetch_meta_refresh_target = self._orig_meta
+
+    def test_meta_refresh_target_resolves_without_click_flow(self):
+        aa._fetch_meta_refresh_target = lambda url, timeout_s=15: "https://boards.greenhouse.io/acme/jobs/1"
+        ctx = FakeContext(no_popup=True)
+        page = FakePage(start_url="https://www.adzuna.com/land/ad/999", context=ctx)
+
+        status, final_url, out_page, diag = aa.resolve_real_url(page, page.url, timeout_s=5)
+
+        self.assertEqual(status, "resolved")
+        self.assertEqual(final_url, "https://boards.greenhouse.io/acme/jobs/1")
+        self.assertTrue(any("meta-refresh" in a for a in diag["actions"]))
+
+    def test_meta_refresh_extraction_regex_matches_real_shape(self):
+        html = ('<meta http-equiv="refresh" content="5; '
+                'url=https://www.ziprecruiter.com/kn/abc?tsid=1&utm_source=adzuna">')
+        m = aa._META_REFRESH_RE.search(html)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), "https://www.ziprecruiter.com/kn/abc?tsid=1&utm_source=adzuna")
+
+    def test_no_meta_refresh_falls_back_to_click_flow(self):
+        aa._fetch_meta_refresh_target = _no_meta_refresh
+        ctx = FakeContext(no_popup=True)
+        page = FakePage(start_url="https://www.adzuna.com/land/ad/456", context=ctx,
+                         redirect_after_n_polls=1)
+
+        status, final_url, out_page, diag = aa.resolve_real_url(page, page.url, timeout_s=5)
+
+        self.assertEqual(status, "resolved")
+        self.assertTrue(any("falling back to click-flow" in a for a in diag["actions"]))
+
+
 class AppliedStateTests(unittest.TestCase):
     """Status -> permanent-seen mapping (item 8/9 of the fix request)."""
 
@@ -283,6 +337,13 @@ class AppliedStateTests(unittest.TestCase):
 
 
 class ApplyToJobRedirectFailedTests(unittest.TestCase):
+    def setUp(self):
+        self._orig_meta = aa._fetch_meta_refresh_target
+        aa._fetch_meta_refresh_target = _no_meta_refresh
+
+    def tearDown(self):
+        aa._fetch_meta_refresh_target = self._orig_meta
+
     def test_redirect_failed_captures_diagnostics_and_screenshot_path(self):
         ctx = FakeContext(no_popup=True)
         page = FakePage(start_url="https://www.adzuna.com/land/ad/1", context=ctx, stuck=True)

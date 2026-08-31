@@ -377,6 +377,35 @@ def _click_apply_trigger(pg, context, diag):
     return pg
 
 
+# Adzuna serves a standard no-JS <meta http-equiv="refresh"> fallback tag on
+# every /land/ad/... response — always present, identical for every client,
+# server-rendered (not gated behind their client-side automation-fingerprint
+# check, which only controls whether their JS auto-redirect *timer* fires in
+# a live browser). Reading this tag is just following an ordinary HTTP
+# redirect, the same as any HTTP client does — not an attempt to evade or
+# spoof anything.
+_META_REFRESH_RE = re.compile(
+    r"""<meta[^>]+http-equiv=['"]refresh['"][^>]*content=['"]\d+;\s*url=([^'"]+)['"]""",
+    re.IGNORECASE)
+
+
+def _fetch_meta_refresh_target(url, timeout_s=15):
+    """Plain HTTP GET (no browser, no Playwright) to an Adzuna /land/ad/...
+    URL, looking for the static meta-refresh destination. Returns the
+    destination URL, or None if it's not present or the request failed —
+    callers must fall back to the click-flow in that case (e.g. Adzuna's
+    account-login-walled 'Easy Apply' postings don't have an external
+    destination at all)."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "job-search-agent/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout_s, context=SSL_CTX) as resp:
+            html = resp.read().decode("utf-8", "replace")
+    except Exception:
+        return None
+    m = _META_REFRESH_RE.search(html)
+    return m.group(1) if m else None
+
+
 def resolve_real_url(page, apply_url, timeout_s=30):
     """Follow aggregator redirects until we land somewhere real, or give up
     with a clear, diagnosable failure.
@@ -416,6 +445,25 @@ def resolve_real_url(page, apply_url, timeout_s=30):
         diag["url"], diag["title"] = page.url, _safe_title(page)
         diag["frame_urls"] = [f.url for f in page.frames]
         return "direct", page.url, page, diag
+
+    # Try the cheap, reliable path first: a plain HTTP GET for the static
+    # meta-refresh fallback, no browser/click-flow needed at all.
+    meta_target = _fetch_meta_refresh_target(apply_url)
+    if meta_target and not _is_adzuna_url(meta_target):
+        diag["actions"].append(f"resolved via static meta-refresh (no browser needed) -> {meta_target}")
+        try:
+            page.goto(meta_target, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+        except PWError as e:
+            diag["actions"].append(f"goto(meta-refresh target) failed: {e}")
+            return "redirect_failed", page.url or meta_target, page, diag
+        diag["url"], diag["title"] = page.url, _safe_title(page)
+        try:
+            diag["frame_urls"] = [f.url for f in page.frames]
+        except Exception:
+            diag["frame_urls"] = []
+        return "resolved", page.url, page, diag
+
+    diag["actions"].append("static meta-refresh not found/usable — falling back to click-flow")
 
     try:
         page.goto(apply_url, wait_until="domcontentloaded", timeout=timeout_s * 1000)
