@@ -745,7 +745,8 @@ def fetch_greenhouse(query, now, window_min, companies):
     out = []
     for slug in companies:
         url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
-        for j in _safe(lambda u=url: get_json(u), f"greenhouse:{slug}").get("jobs", []):
+        data = _safe(lambda u=url: get_json(u), f"greenhouse:{slug}")
+        for j in (data.get("jobs", []) if isinstance(data, dict) else []):
             posted = parse_iso(j.get("updated_at"))
             if not in_window(posted, now, window_min):
                 continue
@@ -783,7 +784,8 @@ def fetch_ashby(query, now, window_min, companies):
     out = []
     for slug in companies:
         url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
-        for j in _safe(lambda u=url: get_json(u), f"ashby:{slug}").get("jobs", []):
+        data = _safe(lambda u=url: get_json(u), f"ashby:{slug}")
+        for j in (data.get("jobs", []) if isinstance(data, dict) else []):
             posted = parse_iso(j.get("publishedAt") or j.get("publishedDate"))
             if not in_window(posted, now, window_min):
                 continue
