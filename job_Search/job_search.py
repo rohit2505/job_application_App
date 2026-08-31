@@ -38,6 +38,7 @@ import smtplib
 import ssl
 import sys
 import textwrap
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
@@ -163,17 +164,29 @@ SSL_CTX = _make_ssl_context()
 
 
 def get_json(url, headers=None):
+    resp, _headers = get_json_with_headers(url, headers=headers)
+    return resp
+
+
+def get_json_with_headers(url, headers=None):
+    """Same as get_json, but also returns the response headers (as a dict) —
+    RapidAPI-fronted APIs (JSearch etc.) report remaining quota via headers
+    like X-RateLimit-Requests-Remaining on EVERY response, including 429s, so
+    callers that want to track quota need those even on failure."""
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "job-search-agent/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8")), dict(resp.headers)
     except urllib.error.HTTPError as e:
         # Surface the API's own message (RapidAPI etc. explain 403/404 in the body).
         try:
             body = e.read().decode("utf-8", "replace")[:300]
         except Exception:
             body = ""
-        raise RuntimeError(f"HTTP {e.code} {e.reason} — {body}") from None
+        err = RuntimeError(f"HTTP {e.code} {e.reason} — {body}")
+        err.headers = dict(e.headers) if e.headers else {}
+        err.code = e.code
+        raise err from None
 
 
 # --------------------------------------------------------------------------- #
@@ -621,6 +634,10 @@ def fetch_jsearch(query, now, window_min, country="us", location=None, remote_on
     if not key:
         print("  [jsearch] skipped — set RAPIDAPI_KEY (free key at rapidapi.com/OpenWeb-Ninja jsearch)")
         return []
+    if quota_exhausted("jsearch"):
+        print("  [jsearch] skipped — quota was exhausted as of the last call; "
+              "not retrying until it's likely reset (see state/rapidapi_quota.json)")
+        return []
     # Bias the query itself toward remote when --remote-only, so Google-for-Jobs
     # returns remote roles instead of us filtering most of an onsite page away.
     # US scoping is handled by the country=us param, so we don't add "in USA".
@@ -645,7 +662,12 @@ def fetch_jsearch(query, now, window_min, country="us", location=None, remote_on
     out = []
     # v5 /search-v2 may nest the job list differently than /job-details did.
     # Find the list of job objects wherever it lives, defensively.
-    resp = get_json(url, headers=headers)
+    try:
+        resp, resp_headers = get_json_with_headers(url, headers=headers)
+    except RuntimeError as e:
+        record_quota_from_error("jsearch", e)
+        raise
+    record_quota_from_success("jsearch", resp_headers)
     data = resp.get("data") if isinstance(resp, dict) else None
     if isinstance(data, list):
         rows = data
@@ -819,6 +841,121 @@ def save_seen(path, seen):
         os.makedirs(d, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(seen, f, indent=0, sort_keys=True)
+
+
+# --------------------------------------------------------------------------- #
+# RapidAPI quota tracking (JSearch etc.) — persisted across runs so we don't
+# keep hammering an exhausted monthly quota and printing a 429 every day.
+# --------------------------------------------------------------------------- #
+QUOTA_STATE_FILE = "state/rapidapi_quota.json"
+
+# Common header spellings RapidAPI providers use for remaining-calls and
+# reset-time. Different APIs on RapidAPI use different casings/names, so we
+# check a handful rather than assuming one — headers are matched
+# case-insensitively by the caller.
+_QUOTA_REMAINING_HEADERS = ("x-ratelimit-requests-remaining", "x-ratelimit-remaining")
+_QUOTA_RESET_HEADERS = ("x-ratelimit-requests-reset", "x-ratelimit-reset")
+
+
+def _load_quota_state(service):
+    try:
+        with open(QUOTA_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get(service, {}) if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_quota_state(service, remaining=None, reset_epoch=None):
+    d = os.path.dirname(QUOTA_STATE_FILE)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    try:
+        with open(QUOTA_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    entry = data.get(service, {})
+    if remaining is not None:
+        entry["remaining"] = remaining
+    if reset_epoch is not None:
+        entry["reset_epoch"] = reset_epoch
+    entry["checked_at"] = datetime.now(timezone.utc).isoformat()
+    data[service] = entry
+    with open(QUOTA_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=0, sort_keys=True)
+
+
+def _extract_quota_from_headers(headers):
+    """headers: dict of response headers (any casing). Returns
+    (remaining_or_None, reset_epoch_or_None)."""
+    lower = {k.lower(): v for k, v in (headers or {}).items()}
+    remaining = None
+    for h in _QUOTA_REMAINING_HEADERS:
+        if h in lower:
+            try:
+                remaining = int(lower[h])
+            except (TypeError, ValueError):
+                pass
+            break
+    reset_epoch = None
+    for h in _QUOTA_RESET_HEADERS:
+        if h in lower:
+            try:
+                # RapidAPI's reset header is typically "seconds until reset"
+                reset_epoch = time.time() + int(lower[h])
+            except (TypeError, ValueError):
+                pass
+            break
+    return remaining, reset_epoch
+
+
+def quota_exhausted(service):
+    """True if we already know (from a previous call's response headers)
+    that this service's quota is at 0 and hasn't reset yet — skip calling it
+    at all this run rather than repeat a guaranteed-to-fail request."""
+    state = _load_quota_state(service)
+    remaining = state.get("remaining")
+    reset_epoch = state.get("reset_epoch")
+    if remaining is None or remaining > 0:
+        return False
+    if reset_epoch and time.time() >= reset_epoch:
+        return False  # reset window has passed — worth trying again
+    if not reset_epoch:
+        # No reset time reported — RapidAPI monthly quotas reset on a
+        # billing-cycle date we don't know, so fall back to "worth retrying
+        # once a day" rather than blocking indefinitely on a guess.
+        checked_at = state.get("checked_at")
+        try:
+            last = datetime.fromisoformat(checked_at)
+            if (datetime.now(timezone.utc) - last) > timedelta(hours=20):
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def record_quota_from_error(service, error):
+    """Call on a caught request exception that may carry .headers/.code
+    (see get_json_with_headers) to persist quota state for next time."""
+    headers = getattr(error, "headers", None) or {}
+    remaining, reset_epoch = _extract_quota_from_headers(headers)
+    code = getattr(error, "code", None)
+    if remaining is None and code == 429:
+        # No usable header, but a 429 is itself proof we're at 0 — record
+        # that so we back off even without a reset hint (see the 20h
+        # fallback in quota_exhausted above).
+        remaining = 0
+    if remaining is not None or reset_epoch is not None:
+        _save_quota_state(service, remaining=remaining, reset_epoch=reset_epoch)
+
+
+def record_quota_from_success(service, headers):
+    remaining, reset_epoch = _extract_quota_from_headers(headers)
+    if remaining is not None or reset_epoch is not None:
+        _save_quota_state(service, remaining=remaining, reset_epoch=reset_epoch)
 
 
 def prune_seen(seen, now):
