@@ -28,7 +28,7 @@ def _no_meta_refresh(url, timeout_s=15):
     """Test default: no static meta-refresh available, forcing the
     click-flow fallback path — matches every existing scenario below, which
     is testing that click-flow logic specifically."""
-    return None
+    return None, "test stub: no meta-refresh"
 
 
 # --------------------------------------------------------------------------- #
@@ -295,7 +295,7 @@ class MetaRefreshResolutionTests(unittest.TestCase):
         aa._fetch_meta_refresh_target = self._orig_meta
 
     def test_meta_refresh_target_resolves_without_click_flow(self):
-        aa._fetch_meta_refresh_target = lambda url, timeout_s=15: "https://boards.greenhouse.io/acme/jobs/1"
+        aa._fetch_meta_refresh_target = lambda url, timeout_s=15: ("https://boards.greenhouse.io/acme/jobs/1", "ok")
         ctx = FakeContext(no_popup=True)
         page = FakePage(start_url="https://www.adzuna.com/land/ad/999", context=ctx)
 

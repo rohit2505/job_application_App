@@ -391,19 +391,29 @@ _META_REFRESH_RE = re.compile(
 
 def _fetch_meta_refresh_target(url, timeout_s=15):
     """Plain HTTP GET (no browser, no Playwright) to an Adzuna /land/ad/...
-    URL, looking for the static meta-refresh destination. Returns the
-    destination URL, or None if it's not present or the request failed —
-    callers must fall back to the click-flow in that case (e.g. Adzuna's
-    account-login-walled 'Easy Apply' postings don't have an external
-    destination at all)."""
+    URL, looking for the static meta-refresh destination.
+
+    Returns (target_url_or_None, reason). `reason` is always a short,
+    specific diagnostic string — e.g. "http 403", "urlopen error: <msg>",
+    "html fetched (N bytes) but no meta-refresh tag found", "ok" — so a
+    failure here is never a silent, unexplained "not found/usable". Callers
+    fall back to the click-flow when target is None (e.g. Adzuna's
+    account-login-walled 'Easy Apply' postings genuinely have no external
+    destination and no meta-refresh tag at all — that's an expected,
+    legitimate "no tag found" case, not a bug)."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "job-search-agent/1.0"})
         with urllib.request.urlopen(req, timeout=timeout_s, context=SSL_CTX) as resp:
+            status = resp.status
             html = resp.read().decode("utf-8", "replace")
-    except Exception:
-        return None
+    except urllib.error.HTTPError as e:
+        return None, f"http {e.code} {e.reason}"
+    except Exception as e:
+        return None, f"request error: {type(e).__name__}: {e}"
     m = _META_REFRESH_RE.search(html)
-    return m.group(1) if m else None
+    if not m:
+        return None, f"http {status}, html fetched ({len(html)} bytes) but no meta-refresh tag found"
+    return m.group(1), "ok"
 
 
 def resolve_real_url(page, apply_url, timeout_s=30):
@@ -448,7 +458,7 @@ def resolve_real_url(page, apply_url, timeout_s=30):
 
     # Try the cheap, reliable path first: a plain HTTP GET for the static
     # meta-refresh fallback, no browser/click-flow needed at all.
-    meta_target = _fetch_meta_refresh_target(apply_url)
+    meta_target, meta_reason = _fetch_meta_refresh_target(apply_url)
     if meta_target and not _is_adzuna_url(meta_target):
         diag["actions"].append(f"resolved via static meta-refresh (no browser needed) -> {meta_target}")
         try:
@@ -463,7 +473,7 @@ def resolve_real_url(page, apply_url, timeout_s=30):
             diag["frame_urls"] = []
         return "resolved", page.url, page, diag
 
-    diag["actions"].append("static meta-refresh not found/usable — falling back to click-flow")
+    diag["actions"].append(f"static meta-refresh unavailable ({meta_reason}) — falling back to click-flow")
 
     try:
         page.goto(apply_url, wait_until="domcontentloaded", timeout=timeout_s * 1000)
