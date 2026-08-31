@@ -763,32 +763,50 @@ def fetch_remoteok(query, now, window_min):
     return out
 
 
-def fetch_himalayas(query, now, window_min):
+def fetch_himalayas(query, now, window_min, max_pages=5):
     # Free, public, no API key/quota — https://himalayas.app/docs/remote-jobs-api
     # applicationLink points to Himalayas' own apply page (not a third-party
     # redirect gate like Adzuna's), so it should be reachable by Playwright.
-    url = "https://himalayas.app/jobs/api?" + urllib.parse.urlencode({"limit": 100})
+    # The API returns a small page (~20 jobs) per call regardless of `limit`,
+    # newest-first, so we page via `offset` until we're past the time window
+    # or hit max_pages — a broad multi-industry board needs real depth to
+    # surface enough data-engineering-titled roles to be worth having.
     out = []
-    data = get_json(url)
-    rows = data.get("jobs", data) if isinstance(data, dict) else data
-    for j in (rows or []):
-        if not isinstance(j, dict):
-            continue
-        posted = parse_epoch(j.get("pubDate"))
-        if not in_window(posted, now, window_min):
-            continue
-        title = j.get("title", "")
-        desc = j.get("description", "") or j.get("excerpt", "")
-        if not matches_query(query, title, desc):
-            continue
-        loc_list = j.get("locationRestrictions") or []
-        loc = ", ".join(loc_list) if loc_list else "Remote (Worldwide)"
-        out.append(job("himalayas", title, j.get("companyName"), loc,
-                       j.get("applicationLink") or j.get("guid"),
-                       tags=j.get("categories", []), remote=True, posted=posted,
-                       no_sponsor=rejects_sponsorship(title, desc),
-                       salary_min=j.get("minSalary"), salary_max=j.get("maxSalary"),
-                       description=desc))
+    offset = 0
+    for _ in range(max_pages):
+        url = "https://himalayas.app/jobs/api?" + urllib.parse.urlencode(
+            {"limit": 100, "offset": offset})
+        data = get_json(url)
+        rows = data.get("jobs", []) if isinstance(data, dict) else (data or [])
+        if not rows:
+            break
+        page_had_in_window = False
+        for j in rows:
+            if not isinstance(j, dict):
+                continue
+            posted = parse_epoch(j.get("pubDate"))
+            # Feed is newest-first: once a job is older than the window, every
+            # later job on every later page is older still — stop paging.
+            if posted and (now - posted).total_seconds() > window_min * 60:
+                continue
+            if not in_window(posted, now, window_min):
+                continue
+            page_had_in_window = True
+            title = j.get("title", "")
+            desc = j.get("description", "") or j.get("excerpt", "")
+            if not matches_query(query, title, desc):
+                continue
+            loc_list = j.get("locationRestrictions") or []
+            loc = ", ".join(loc_list) if loc_list else "Remote (Worldwide)"
+            out.append(job("himalayas", title, j.get("companyName"), loc,
+                           j.get("applicationLink") or j.get("guid"),
+                           tags=j.get("categories", []), remote=True, posted=posted,
+                           no_sponsor=rejects_sponsorship(title, desc),
+                           salary_min=j.get("minSalary"), salary_max=j.get("maxSalary"),
+                           description=desc))
+        offset += len(rows)
+        if not page_had_in_window:
+            break  # this whole page was already outside the window — stop
     return out
 
 
