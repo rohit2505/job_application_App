@@ -523,7 +523,11 @@ def main():
                     "state/auto_applied_success.json"),
                     help="jobs actually submitted here — apply_notifier.py reads this "
                          "too, so it never re-notifies you about one already done")
-    ap.add_argument("--headless", action="store_true", default=True)
+    ap.add_argument("--headless", action="store_true", default=False,
+                    help="run headless. Default is headed (needs xvfb-run in CI) because "
+                         "Adzuna's own /land/ad/... redirect page does a client-side JS "
+                         "redirect that does not fire for headless Chromium — likely "
+                         "fingerprint-based anti-scraping on their end, not a bug here.")
     args = ap.parse_args()
 
     try:

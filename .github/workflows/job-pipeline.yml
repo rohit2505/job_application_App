@@ -107,7 +107,11 @@ jobs:
       - name: Stage 4 — auto-apply (Greenhouse only, CAPTCHA-safe)
         working-directory: apply_agent
         run: |
-          python3 auto_apply.py \
+          # xvfb-run + a headed browser: Adzuna's own /land/ad/... redirect
+          # page does a client-side JS redirect that doesn't fire for headless
+          # Chromium (fingerprint-based anti-scraping on their end) — a real,
+          # headed browser rendering under a virtual display gets past it.
+          xvfb-run -a python3 auto_apply.py \
             --scored ../job_filter_agent/scored.json \
             --resumes ../resume_creation_agent/output \
             --profile ../profile.json \
