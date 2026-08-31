@@ -467,6 +467,23 @@ def _safe_title(pg):
         return ""
 
 
+# Titles used by Cloudflare (and similar) bot-challenge interstitials. Seen in
+# practice on some Himalayas company job pages. We never attempt to solve or
+# evade these (same hard rule as CAPTCHAs) — we just make sure a page that
+# never got past the challenge is diagnosed as "blocked" (retry-eligible),
+# never silently misreported as a confirmed "not_greenhouse" result, since we
+# never actually saw the real page.
+_CHALLENGE_TITLE_PATTERNS = (
+    "just a moment", "attention required", "checking your browser",
+    "verify you are human", "verifying you are human", "are you a robot",
+)
+
+
+def _is_challenge_page(page):
+    title = (_safe_title(page) or "").lower()
+    return any(p in title for p in _CHALLENGE_TITLE_PATTERNS)
+
+
 def _close_extra_page(original_page, ended_up_on):
     """If resolve_real_url moved us onto a popup/new tab, close whichever
     page we're NOT continuing to use, so tabs don't pile up across jobs."""
@@ -612,7 +629,7 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
 def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
     """Returns (status, log, screenshot_path). status in:
     'applied', 'not_greenhouse', 'captcha', 'unanswered', 'redirect_failed',
-    'error'.
+    'blocked', 'error'.
 
     'redirect_failed' means we never even confirmed which ATS (if any) the
     job uses — still stuck on Adzuna, or a navigation error along the way.
@@ -663,6 +680,15 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
 
     frame = find_greenhouse_frame(page)
     if not frame:
+        if _is_challenge_page(page):
+            # We never actually saw the real page — a bot-challenge
+            # interstitial (Cloudflare etc.) loaded instead. This is NOT a
+            # confirmed "not Greenhouse" result, so it must stay
+            # retry-eligible, not be permanently blacklisted. We do not
+            # attempt to solve or evade the challenge, same hard rule as
+            # CAPTCHAs — just diagnose it honestly.
+            log.append({"blocked_title": _safe_title(page)})
+            return "blocked", log, None
         # We DID leave Adzuna (rstatus == "resolved"/"direct") and confirmed
         # this is a real, non-Greenhouse destination — this one is a
         # legitimate permanent skip, not a transient failure.
@@ -850,10 +876,13 @@ def main():
                                   "arrive in time / not configured)",
                     "redirect_failed": "couldn't resolve past Adzuna's redirect "
                                         "(or hit a navigation error) — retryable",
+                    "blocked": "landed on a bot-challenge page (e.g. Cloudflare) "
+                               "instead of the real posting — retryable, not "
+                               "attempted to bypass",
                     "error": "unexpected error during fill/submit",
                 }.get(status, status)
                 print(f"  [skip:{status}] {title[:40]} — {company[:20]} — {reason}")
-                if status in ("not_greenhouse", "redirect_failed"):
+                if status in ("not_greenhouse", "redirect_failed", "blocked"):
                     for item in log:
                         if "resolved_url" in item:
                             print(f"      resolved_status: {item.get('resolved_status')}")

@@ -253,6 +253,23 @@ class ResolveRealUrlTests(unittest.TestCase):
         self.assertIsNone(frame)
 
 
+class ChallengePageTests(unittest.TestCase):
+    def test_cloudflare_challenge_page_is_blocked_not_not_greenhouse(self):
+        """A bot-challenge interstitial (e.g. Cloudflare's 'Just a moment...')
+        must never be misreported as a confirmed non-Greenhouse result — that
+        would permanently blacklist a job we never actually saw."""
+        ctx = FakeContext(no_popup=True)
+        page = FakePage(start_url="https://example.com/companies/acme/jobs/1", context=ctx)
+        page._title = "Just a moment..."
+        job = {"url": page.url, "company": "Acme Co", "title": "Data Engineer"}
+
+        status, log, screenshot = aa.apply_to_job(page, job, {}, "", "/tmp/does-not-exist.docx",
+                                                   "/tmp/does-not-exist.docx")
+
+        self.assertEqual(status, "blocked")
+        self.assertNotIn("blocked", aa.PERMANENT_STATUSES)
+
+
 class AppliedStateTests(unittest.TestCase):
     """Status -> permanent-seen mapping (item 8/9 of the fix request)."""
 
