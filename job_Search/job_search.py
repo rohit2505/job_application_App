@@ -57,7 +57,7 @@ ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
 
 # What runs by default: the aggregators + JSearch. The company ATS boards
 # (greenhouse/lever/ashby) are OFF by default — enable with --sources if wanted.
-DEFAULT_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse",
+DEFAULT_SOURCES = ["remotive", "arbeitnow", "jobicy", "muse",
                    "remoteok", "jsearch", "himalayas"]
 
 # ==========================================================================  #
