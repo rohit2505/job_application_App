@@ -1,6 +1,23 @@
 {
-  "_comment": "Company ATS board slugs to poll for apply-direct roles. Edit freely. A wrong/renamed slug just 404s and is skipped. Find a slug from the company's careers URL: greenhouse boards.greenhouse.io/<slug>, lever jobs.lever.co/<slug>, ashby jobs.ashbyhq.com/<slug>.",
-  "greenhouse": ["databricks", "stripe", "airbnb", "coinbase", "dropbox"],
-  "lever": ["plaid"],
-  "ashby": ["ramp", "notion", "openai"]
+  "_comment": "Direct ATS board slugs for job_search.py's greenhouse/lever/ashby sources. These hit each platform's own public job-board API directly, so the URLs returned are the real, direct apply links (no Adzuna-style redirect gate) — best for auto_apply.py's Greenhouse auto-fill, and faster/easier for manual apply on Lever/Ashby too. Unknown or renamed slugs just 404 and are skipped silently, so a wrong entry never breaks a run. Curated for data engineering / data platform / analytics engineering roles at companies known to pay well in that space.",
+
+  "greenhouse": [
+    "databricks", "snowflake", "stripe", "airbnb", "coinbase", "dropbox",
+    "doordash", "robinhood", "affirm", "instacart", "reddit", "discord",
+    "pinterest", "cloudflare", "confluent", "mongodb", "datadog", "elastic",
+    "asana", "figma", "webflow", "duolingo", "roblox", "unity", "zapier",
+    "anthropic", "twilio", "gitlab", "grammarly", "brex", "chime",
+    "samsara", "carta", "flexport", "gusto", "checkr", "benchling",
+    "toasttab", "squarespace", "netflix", "lyft", "cedar", "sofi"
+  ],
+
+  "lever": [
+    "plaid", "netflix", "attentive", "rippling", "vercel", "eightsleep",
+    "papaya-global", "clover-health"
+  ],
+
+  "ashby": [
+    "ramp", "notion", "openai", "linear", "mercury", "retool",
+    "scale-ai", "deel", "posthog", "zapier"
+  ]
 }
