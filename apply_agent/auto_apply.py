@@ -433,6 +433,7 @@ def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
 
     frame = find_greenhouse_frame(page)
     if not frame:
+        log.append({"resolved_url": final_url, "frame_urls": [f.url for f in page.frames]})
         return "not_greenhouse", log, None
 
     if has_captcha(frame):
@@ -593,6 +594,11 @@ def main():
                     "error": "unexpected error during fill/submit",
                 }.get(status, status)
                 print(f"  [skip:{status}] {title[:40]} — {company[:20]} — {reason}")
+                if status == "not_greenhouse":
+                    for item in log:
+                        if "resolved_url" in item:
+                            print(f"      resolved to: {item['resolved_url']}")
+                            print(f"      frames on page: {item['frame_urls']}")
                 # Leave this job for the existing email-me-the-link flow
                 # (apply_notifier.py) — nothing else to do here.
         browser.close()
