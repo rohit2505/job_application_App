@@ -29,7 +29,6 @@ env:
   JOB_QUERY: "data engineer,analytics engineer,etl developer,data platform engineer,BI engineer,data architect,senior data engineer"
   JOB_LOCATION: "United States"
   WINDOW_MIN: "1440"          # look back 24h since this runs daily
-  SOURCES: "remotive,arbeitnow,adzuna,jobicy,muse,remoteok,jsearch,greenhouse,lever,ashby"
   MIN_SALARY: "160000"
   MIN_SCORE: "70"
   TOP: "10"
