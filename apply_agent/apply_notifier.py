@@ -117,6 +117,56 @@ def send_whatsapp(body):
         return False, f"send error: {e}"
 
 
+def _multipart_encode(fields, files):
+    """Minimal multipart/form-data encoder (stdlib only — no `requests` dep).
+    fields: {name: value}. files: {name: (filename, bytes, content_type)}."""
+    boundary = "----jobagent" + str(int(time.time() * 1000))
+    parts = []
+    for name, value in fields.items():
+        parts.append(f"--{boundary}\r\n"
+                     f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                     f"{value}\r\n".encode("utf-8"))
+    for name, (filename, data, content_type) in files.items():
+        parts.append(
+            (f"--{boundary}\r\n"
+             f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+             f"Content-Type: {content_type}\r\n\r\n").encode("utf-8")
+            + data + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+    body = b"".join(parts)
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def send_telegram_document(path, caption=""):
+    """Send a file as a native Telegram document (not a link) — on mobile
+    this lands in the chat's own cached files, so the file-upload dialog on
+    a job's application page can pick it straight from 'Recent'/'Files'
+    without the Gmail download-then-reupload round trip. Best-effort:
+    returns (ok, detail); callers should not treat a failure here as fatal
+    since the email attachment is still the guaranteed-delivery path."""
+    token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
+    if not (token and chat_id):
+        return False, "telegram creds not set"
+    if not path or not os.path.exists(path):
+        return False, "file not found"
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        docx_type = ("application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document")
+        body, content_type = _multipart_encode(
+            {"chat_id": chat_id, "caption": caption[:1024]},
+            {"document": (os.path.basename(path), data, docx_type)})
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+        req = urllib.request.Request(url, data=body,
+                                      headers={"Content-Type": content_type})
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
+            json.loads(r.read().decode())
+        return True, "sent"
+    except Exception as e:
+        return False, f"send error: {e}"
+
+
 # ---- email ----
 SUBJECT_TAG = "[JobAgent]"  # every email this script sends carries this tag — set up ONE
                              # Gmail filter matching it to file everything into one label
@@ -230,11 +280,25 @@ def main():
                 "record to reference later if you get an interview." if attachments else
                 "No tailored resume/cover letter found — run the resume agent for this job first.")
         emailed = send_email(f"{title} @ {company}", body, attachments)
-        # 2) Telegram ping (best-effort)
+        # 2) Telegram ping (best-effort) — plus the actual files as native
+        # Telegram documents, so applying is possible entirely from a phone:
+        # tap the link, and when the job site asks for a resume upload, the
+        # file is already sitting in this chat's cache, no Gmail round trip.
         tg_ok, detail = send_whatsapp(f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
-                                      f"Apply: {link}\n(resume in your email)")
+                                      f"Apply: {link}\n"
+                                      + ("(resume + cover letter below)" if attachments
+                                         else "(resume in your email)"))
         if not tg_ok and emailed:
             print(f"  [telegram] not delivered ({detail}) — job is in your email.", file=sys.stderr)
+        if tg_ok:
+            for path, label in ((resume, "Resume"), (cover, "Cover letter")):
+                if not path:
+                    continue
+                doc_ok, doc_detail = send_telegram_document(
+                    path, caption=f"{label} — {title} @ {company}")
+                if not doc_ok:
+                    print(f"  [telegram] {label.lower()} not delivered ({doc_detail}) "
+                          "— it's in your email.", file=sys.stderr)
         if emailed or tg_ok:
             seen.add(jid)
             sent += 1

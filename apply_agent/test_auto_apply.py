@@ -36,10 +36,11 @@ def _no_meta_refresh(url, timeout_s=15):
 # module actually touches.
 # --------------------------------------------------------------------------- #
 class FakeLocator:
-    def __init__(self, visible=False, raises_on_click=None):
+    def __init__(self, visible=False, raises_on_click=None, count_override=None):
         self._visible = visible
         self._raises_on_click = raises_on_click
         self.clicked = False
+        self._count_override = count_override
 
     @property
     def first(self):
@@ -55,6 +56,30 @@ class FakeLocator:
         self.clicked = True
         if self._raises_on_click:
             raise self._raises_on_click
+
+    def count(self):
+        return self._count_override if self._count_override is not None else (1 if self._visible else 0)
+
+    def fill(self, value):
+        pass
+
+    def set_input_files(self, path):
+        pass
+
+    def get_attribute(self, name):
+        return None
+
+    def inner_text(self):
+        return ""
+
+    def nth(self, i):
+        return self
+
+    def check(self):
+        pass
+
+    def get_by_label(self, text):
+        return FakeLocator(visible=False, count_override=0)
 
 
 class FakeFrame:
@@ -95,6 +120,21 @@ class FakePage:
 
     def get_by_role(self, role, name=None):
         return FakeLocator(visible=False)
+
+    def locator(self, selector):
+        # Test-configurable: self._locator_counts maps selector substrings
+        # to a count, defaulting to 0 (element not present) for anything
+        # unconfigured — safe for fill routines that best-effort skip
+        # absent optional fields.
+        counts = getattr(self, "_locator_counts", {})
+        for key, n in counts.items():
+            if key in selector:
+                return FakeLocator(visible=n > 0, count_override=n)
+        return FakeLocator(visible=False, count_override=0)
+
+    @property
+    def main_frame(self):
+        return self
 
     def wait_for_timeout(self, ms):
         # simulate the passage of time advancing a delayed/stuck redirect
@@ -322,6 +362,51 @@ class MetaRefreshResolutionTests(unittest.TestCase):
 
         self.assertEqual(status, "resolved")
         self.assertTrue(any("falling back to click-flow" in a for a in diag["actions"]))
+
+
+class LeverSupportTests(unittest.TestCase):
+    """Lever detection/fill/CAPTCHA-block routing (destination-side — fires
+    on a lever.co URL regardless of which source found the job)."""
+
+    def setUp(self):
+        self._orig_meta = aa._fetch_meta_refresh_target
+        aa._fetch_meta_refresh_target = _no_meta_refresh
+
+    def tearDown(self):
+        aa._fetch_meta_refresh_target = self._orig_meta
+
+    def _lever_page(self, extra_locator_counts=None, submit_visible=True):
+        ctx = FakeContext(no_popup=True)
+        page = FakePage(start_url="https://jobs.lever.co/acme/apply", context=ctx)
+        page._locator_counts = {"input[name='resume']": 1}
+        if extra_locator_counts:
+            page._locator_counts.update(extra_locator_counts)
+        page.get_by_role = lambda role, name=None: FakeLocator(visible=submit_visible)
+        return page
+
+    def test_find_lever_form_detects_by_url_and_resume_field(self):
+        page = self._lever_page()
+        frame = aa.find_lever_form(page)
+        self.assertIsNotNone(frame)
+
+    def test_find_lever_form_none_without_resume_field(self):
+        page = self._lever_page(extra_locator_counts={"input[name='resume']": 0})
+        frame = aa.find_lever_form(page)
+        self.assertIsNone(frame)
+
+    def test_hcaptcha_on_lever_blocks_submission_never_solved(self):
+        page = self._lever_page(extra_locator_counts={"h-captcha": 1})
+        job = {"url": page.url, "company": "Acme", "title": "Engineer"}
+        status, log, screenshot = aa.apply_to_job(page, job, {}, "", "/tmp/x.docx", "/tmp/x.docx")
+        self.assertEqual(status, "captcha")
+        self.assertIsNone(screenshot)
+
+    def test_lever_form_with_no_captcha_and_submit_button_applies(self):
+        page = self._lever_page()
+        job = {"url": page.url, "company": "Acme", "title": "Engineer"}
+        status, log, screenshot = aa.apply_to_job(page, job, {"first_name": "Jane"}, "",
+                                                   "/tmp/x.docx", "/tmp/x.docx")
+        self.assertEqual(status, "applied")
 
 
 class AppliedStateTests(unittest.TestCase):

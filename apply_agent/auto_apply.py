@@ -563,10 +563,40 @@ def find_greenhouse_frame(page):
 
 
 def has_captcha(frame):
+    """Detects both reCAPTCHA (Greenhouse) and hCaptcha (seen on some Lever
+    boards) — same hard rule either way: if present, stop and fall back to
+    the manual/email flow. Never attempt to solve or bypass either, ever."""
     try:
-        return frame.locator("iframe[src*='recaptcha'], .g-recaptcha, [name='g-recaptcha-response']").count() > 0
+        return frame.locator(
+            "iframe[src*='recaptcha'], .g-recaptcha, [name='g-recaptcha-response'], "
+            "iframe[src*='hcaptcha'], .h-captcha, [name='h-captcha-response']"
+        ).count() > 0
     except Exception:
         return False
+
+
+LEVER_HOST_SUFFIX = "lever.co"
+
+
+def _is_lever_url(url):
+    host = _hostname(url)
+    return host == LEVER_HOST_SUFFIX or host.endswith("." + LEVER_HOST_SUFFIX)
+
+
+def find_lever_form(page):
+    """Lever's application form is the page itself (not an iframe, unlike
+    Greenhouse) — confirmed live against a real Lever board. Detected by
+    hostname plus the presence of the standard resume file input, so a
+    lever.co page that's just the job description (not yet on /apply)
+    doesn't get mistaken for the form."""
+    try:
+        if not _is_lever_url(page.url):
+            return None
+        if page.locator("input[name='resume']").count() > 0:
+            return page.main_frame
+    except Exception:
+        pass
+    return None
 
 
 def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log):
@@ -684,6 +714,175 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
 
 
+def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, log):
+    """Fills Lever's standard application form — verified live against a
+    real Lever posting (jobs.lever.co). Field names are fixed/standard
+    across Lever boards: name, email, phone, location, resume (file),
+    urls[LinkedIn]/urls[GitHub]/urls[Portfolio], plus custom "cards[<uuid>]
+    [fieldN]" questions (radio groups and free-text) that vary per posting.
+
+    Known best-effort limitation: Lever's location field is often a
+    location-autocomplete widget backed by a hidden `selectedLocation`
+    field — filling the visible text input alone may not populate that
+    hidden field the way picking a dropdown suggestion would. If the
+    posting requires a resolved location and this isn't enough, the submit
+    click below will fail and this correctly falls through to the
+    unanswered/error path rather than silently claiming success.
+    """
+    def try_fill(selector, value):
+        if not value:
+            return
+        try:
+            el = frame.locator(selector).first
+            if el.count():
+                el.fill(str(value))
+        except Exception:
+            pass
+
+    full_name = " ".join(x for x in (profile.get("first_name"), profile.get("last_name")) if x)
+    try_fill("input[name='name']", full_name)
+    try_fill("input[name='email']", profile.get("email"))
+    try_fill("input[name='phone']", profile.get("phone"))
+    loc = ", ".join(x for x in (profile.get("location_city"), profile.get("location_state")) if x)
+    try_fill("input[name='location']", loc)
+    try_fill("input[name='urls[LinkedIn]']", profile.get("linkedin"))
+    try_fill("input[name='urls[GitHub]']", profile.get("github"))
+    try_fill("input[name='urls[Portfolio]']", profile.get("portfolio_url"))
+
+    for name, path in (("resume", resume_path),):
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            el = frame.locator(f"input[name='{name}']").first
+            if el.count():
+                el.set_input_files(path)
+        except Exception:
+            pass
+
+    # Custom per-posting questions: Lever groups these as
+    # cards[<uuid>][field0] (radio options) or cards[<uuid>][field1]
+    # (free-text). Group by the cards[<uuid>] prefix, same
+    # ask-Claude-then-select pattern as Greenhouse's checkbox groups.
+    try:
+        radios = frame.locator("input[type='radio'][name^='cards[']")
+        n = radios.count()
+        groups = {}
+        for i in range(n):
+            el = radios.nth(i)
+            name = el.get_attribute("name") or ""
+            if name:
+                groups.setdefault(name, []).append(el)
+        for name, els in groups.items():
+            options = []
+            for el in els:
+                try:
+                    lbl_id = el.get_attribute("id")
+                    lbl = frame.locator(f"label[for='{lbl_id}']").first if lbl_id else None
+                    if not (lbl and lbl.count()):
+                        lbl = el.locator("xpath=following-sibling::*[1]").first
+                    options.append((lbl.inner_text().strip() if lbl and lbl.count() else "", el))
+                except Exception:
+                    options.append(("", el))
+            question_text = ""
+            try:
+                fs = els[0].locator("xpath=ancestor::div[contains(@class,'application-question') "
+                                     "or contains(@class,'card')][1]//*[self::div or self::span]"
+                                     "[contains(@class,'application-label') or "
+                                     "contains(@class,'field-label')]").first
+                if fs.count():
+                    question_text = fs.inner_text().strip()
+            except Exception:
+                pass
+            question = question_text or name
+            opt_names = [o for o, _ in options if o]
+            ans = answer_question(question, opt_names, resume_text, profile)
+            if ans:
+                chosen = [a.strip().lower() for a in ans.split(",")]
+                for label, el in options:
+                    if label.strip().lower() in chosen:
+                        try:
+                            el.check()
+                        except Exception:
+                            pass
+                log.append({"question": question, "answer": ans, "source": "claude"})
+            else:
+                log.append({"question": question, "answer": None, "source": "unanswered"})
+    except Exception as e:
+        print(f"  [fill] lever radio-question pass error: {e}", file=sys.stderr)
+
+    try:
+        textareas = frame.locator("textarea[name^='cards[']")
+        n = textareas.count()
+        for i in range(n):
+            el = textareas.nth(i)
+            name = el.get_attribute("name") or ""
+            question_text = ""
+            try:
+                fs = el.locator("xpath=ancestor::div[contains(@class,'application-question') "
+                                 "or contains(@class,'card')][1]//*[self::div or self::span]"
+                                 "[contains(@class,'application-label') or "
+                                 "contains(@class,'field-label')]").first
+                if fs.count():
+                    question_text = fs.inner_text().strip()
+            except Exception:
+                pass
+            question = question_text or name
+            ans = answer_question(question, None, resume_text, profile)
+            if ans:
+                el.fill(ans)
+                log.append({"question": question, "answer": ans, "source": "claude"})
+            else:
+                log.append({"question": question, "answer": None, "source": "unanswered"})
+    except Exception as e:
+        print(f"  [fill] lever textarea-question pass error: {e}", file=sys.stderr)
+
+
+def _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log):
+    """Shared tail end for any ATS we can fill (Greenhouse, Lever, ...):
+    escalate unanswered questions to Telegram, re-check for CAPTCHA
+    (some forms only reveal it after fields are filled), then submit and
+    screenshot. Only 'applied' is a genuine submission; every other exit
+    here is a caller-visible non-permanent status."""
+    unanswered = [q for q in log if q.get("source") == "unanswered"]
+    if unanswered:
+        # Escalate to Telegram for each unanswered question, in order. If any
+        # one of them can't be resolved in time, bail out — never submit with
+        # a blank required question.
+        for item in unanswered:
+            asked_at = time.time()
+            sent = send_whatsapp(
+                f"🧑‍💻 Stuck on {job.get('company','')} application:\n"
+                f"\"{item['question']}\"\nReply with your answer.")
+            if not sent:
+                return "unanswered", log, None
+            reply = wait_for_whatsapp_reply(asked_at)
+            if not reply:
+                return "unanswered", log, None
+            item["answer"], item["source"] = reply, "telegram"
+            try:
+                el = frame.get_by_label(item["question"]).first
+                if el.count():
+                    el.fill(reply)
+            except Exception:
+                pass
+
+    if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
+        return "captcha", log, None
+
+    shot_path = None
+    try:
+        submit = frame.get_by_role("button", name=re.compile("submit", re.I)).first
+        if submit.count():
+            submit.click()
+            page.wait_for_timeout(3000)
+            shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_confirmation.png"
+            page.screenshot(path=shot_path, full_page=True)
+            return "applied", log, shot_path
+    except Exception as e:
+        log.append({"error": str(e)})
+    return "error", log, shot_path
+
+
 def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
     """Returns (status, log, screenshot_path). status in:
     'applied', 'not_greenhouse', 'captcha', 'unanswered', 'redirect_failed',
@@ -737,65 +936,33 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
         return "redirect_failed", log, shot_path
 
     frame = find_greenhouse_frame(page)
-    if not frame:
-        if _is_challenge_page(page):
-            # We never actually saw the real page — a bot-challenge
-            # interstitial (Cloudflare etc.) loaded instead. This is NOT a
-            # confirmed "not Greenhouse" result, so it must stay
-            # retry-eligible, not be permanently blacklisted. We do not
-            # attempt to solve or evade the challenge, same hard rule as
-            # CAPTCHAs — just diagnose it honestly.
-            log.append({"blocked_title": _safe_title(page)})
-            return "blocked", log, None
-        # We DID leave Adzuna (rstatus == "resolved"/"direct") and confirmed
-        # this is a real, non-Greenhouse destination — this one is a
-        # legitimate permanent skip, not a transient failure.
-        return "not_greenhouse", log, None
+    if frame:
+        if has_captcha(frame):
+            return "captcha", log, None
+        fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log)
+        return _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log)
 
-    if has_captcha(frame):
-        return "captcha", log, None
+    lever_frame = find_lever_form(page)
+    if lever_frame:
+        if has_captcha(lever_frame):
+            return "captcha", log, None
+        fill_lever_form(lever_frame, job, profile, resume_text, resume_path, cover_path, log)
+        return _finish_application(page, lever_frame, job, profile, resume_text, resume_path, cover_path, log)
 
-    fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log)
+    if _is_challenge_page(page):
+        # We never actually saw the real page — a bot-challenge
+        # interstitial (Cloudflare etc.) loaded instead. This is NOT a
+        # confirmed "not Greenhouse/Lever" result, so it must stay
+        # retry-eligible, not be permanently blacklisted. We do not
+        # attempt to solve or evade the challenge, same hard rule as
+        # CAPTCHAs — just diagnose it honestly.
+        log.append({"blocked_title": _safe_title(page)})
+        return "blocked", log, None
 
-    unanswered = [q for q in log if q.get("source") == "unanswered"]
-    if unanswered:
-        # Escalate to WhatsApp for each unanswered question, in order. If any
-        # one of them can't be resolved in time, bail out — never submit with
-        # a blank required question.
-        for item in unanswered:
-            asked_at = time.time()
-            sent = send_whatsapp(
-                f"🧑‍💻 Stuck on {job.get('company','')} application:\n"
-                f"\"{item['question']}\"\nReply with your answer.")
-            if not sent:
-                return "unanswered", log, None
-            reply = wait_for_whatsapp_reply(asked_at)
-            if not reply:
-                return "unanswered", log, None
-            item["answer"], item["source"] = reply, "telegram"
-            # best-effort: try to fill the field with the reply
-            try:
-                el = frame.get_by_label(item["question"]).first
-                if el.count():
-                    el.fill(reply)
-            except Exception:
-                pass
-
-    if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
-        return "captcha", log, None
-
-    shot_path = None
-    try:
-        submit = frame.get_by_role("button", name=re.compile("submit", re.I)).first
-        if submit.count():
-            submit.click()
-            page.wait_for_timeout(3000)
-            shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_confirmation.png"
-            page.screenshot(path=shot_path, full_page=True)
-            return "applied", log, shot_path
-    except Exception as e:
-        log.append({"error": str(e)})
-    return "error", log, shot_path
+    # We DID leave Adzuna (rstatus == "resolved"/"direct") and confirmed
+    # this is a real destination that isn't a supported ATS — this one is a
+    # legitimate permanent skip, not a transient failure.
+    return "not_greenhouse", log, None
 
 
 # --------------------------------------------------------------------------- #
@@ -927,7 +1094,7 @@ def main():
             else:
                 skipped += 1
                 reason = {
-                    "not_greenhouse": "not a Greenhouse-hosted form (unsupported ATS)",
+                    "not_greenhouse": "not a Greenhouse or Lever form (unsupported ATS)",
                     "captcha": "CAPTCHA present — will not auto-submit",
                     "unanswered": "a screening question couldn't be answered "
                                   "(Claude was unsure, and Telegram reply didn't "
