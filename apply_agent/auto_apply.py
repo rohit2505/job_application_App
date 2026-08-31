@@ -260,34 +260,64 @@ LABEL_KEYWORDS = {
 def resolve_real_url(page, apply_url):
     """Follow aggregator redirects until we land somewhere real.
 
-    Deliberately does NOT click the aggregator's "Apply" link — those often
-    open in a new tab (target="_blank"), which leaves the original page
-    un-navigated and this whole function silently looking at the wrong page.
-    Instead, read the link's real href and navigate there directly, then
-    settle through Adzuna's own further client-side (JS) redirect hop(s) by
-    polling page.url until it stops changing.
-    """
-    page.goto(apply_url, wait_until="networkidle", timeout=45000)
-    try:
-        href = page.locator("a:has-text('Apply for this job')").first.get_attribute("href", timeout=5000)
-    except Exception:
-        href = None
-    if href:
-        page.goto(href, wait_until="networkidle", timeout=45000)
+    Adzuna's "Apply for this job" link is NOT a plain href to the employer —
+    its href points at Adzuna's own /land/ad/... redirector, but navigating
+    there directly (page.goto on the extracted href) reliably stalls: the
+    page just sits on /land/ad/... and never fires its client-side redirect
+    to the real employer site. The actual site only fires that redirect when
+    the click happens through the page's own JS handler, which first pops an
+    inline "Receive similar jobs by email" widget with a "No thanks, take me
+    to the job" link — THAT click is what triggers the real navigation.
+    Confirmed by watching the flow live: goto(href) hangs on /land/ad/...
+    indefinitely, while click -> click "No thanks..." lands on the employer
+    site (e.g. cedar.com) within a few seconds.
 
-    # Adzuna's /land/ad/... page then JS-redirects again to the real employer
-    # page; wait for that chain to settle before deciding where we ended up.
-    last_url = None
-    for _ in range(5):
-        page.wait_for_timeout(1200)
+    So: click through the real UI instead of following the href, handling
+    both the "open in same tab" and "open in a new tab" cases.
+    Returns (final_url, page_to_use_from_here_on).
+    """
+    page.goto(apply_url, wait_until="domcontentloaded", timeout=45000)
+
+    # dismiss the "email alert" popup modal if Adzuna shows one up front
+    for txt in ("No thanks", "No, thanks"):
         try:
-            page.wait_for_load_state("networkidle", timeout=8000)
+            btn = page.get_by_text(txt, exact=False).first
+            if btn.is_visible(timeout=1500):
+                btn.click(timeout=1500)
+                page.wait_for_timeout(400)
         except Exception:
             pass
-        if page.url == last_url:
+
+    context = page.context
+    target = page
+    try:
+        with context.expect_page(timeout=4000) as new_page_info:
+            page.locator("a:has-text('Apply for this job')").first.click(timeout=5000)
+        target = new_page_info.value
+        target.wait_for_load_state("domcontentloaded", timeout=15000)
+    except Exception:
+        pass  # no new tab opened — the click happened in the same page
+
+    # that click reveals the inline "Receive similar jobs by email" widget;
+    # its "No thanks, take me to the job" link is the real redirect trigger
+    try:
+        target.get_by_text("No thanks, take me to the job", exact=False).first.click(timeout=6000)
+    except Exception:
+        pass
+
+    # settle through Adzuna's further client-side (JS) redirect hop(s) by
+    # polling url until it stops changing
+    last_url = None
+    for _ in range(6):
+        target.wait_for_timeout(1500)
+        try:
+            target.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        if target.url == last_url:
             break
-        last_url = page.url
-    return page.url
+        last_url = target.url
+    return target.url, target
 
 
 def find_greenhouse_frame(page):
@@ -427,7 +457,7 @@ def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
     'applied', 'not_greenhouse', 'captcha', 'unanswered', 'error'."""
     log = []
     try:
-        final_url = resolve_real_url(page, job.get("url", ""))
+        final_url, page = resolve_real_url(page, job.get("url", ""))
     except Exception as e:
         return "error", [{"error": str(e)}], None
 
