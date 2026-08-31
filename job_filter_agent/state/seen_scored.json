@@ -1,1 +1,49 @@
-{}
+{
+"https://jobicy.com/jobs/152257-director-specialist-sales-engineering-data-security": {
+"employer_type": "direct",
+"score": 28
+},
+"https://www.adzuna.com/details/5862761720?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5863048636?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=BFC1FE033DA593194DE91D6468A5C3DB223AC95A": {
+"drop": "employer_type:consulting",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863105784?se=mJbLJpGl8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=3ED90E8C49B8855938EFED4FF7CD94A2D51D63F9": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5863106367?se=mJbLJpGl8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=26ACBF4CF107C29C3BCF5B6FE75F420B85AAFB0D": {
+"drop": "employer_type:staffing",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5863122532?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=2DE3551880AA1A067231DDAAA3E604FF1EFC956B": {
+"drop": "employer_type:consulting",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863122934?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=C31DF3AA229B33786C4AF23DA723FC23804F5C1C": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5863123976?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=4479EA61AEE727417A8A70B46D74196DE4A3E82C": {
+"employer_type": "direct",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863217434?se=WuQpLJGl8RGcfKYe_cIpvA&utm_medium=api&utm_source=ad8b68c8&v=E0E0FDB2D3763349B2D26F0ED9D147FFACDF90D4": {
+"drop": "staffing_blocklist"
+},
+"https://www.adzuna.com/land/ad/5863220419?se=UGybI5Gl8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=02F2E5E258A4D7AB8762AFBA0642D18175359807": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5863220447?se=UGybI5Gl8RGxSf1iGXKoQA&utm_medium=api&utm_source=ad8b68c8&v=1D796EF52DD60CFBE6820CA3673C6541EDFA676A": {
+"drop": "employer_type:staffing",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863220482?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=BC621C413416FA00E0A7F6F8B1DFE5FB91C9C2ED": {
+"drop": "employer_type:staffing",
+"score": 72
+}
+}
