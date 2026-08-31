@@ -223,11 +223,48 @@ def tailor(resume, job, model, key):
     with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     text = "".join(b.get("text", "") for b in data.get("content", []))
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
-        raise RuntimeError("model returned no JSON")
-    obj = json.loads(m.group(0))
+    obj = _extract_json_object(text)
+    if obj is None:
+        raise RuntimeError(f"model returned no parseable JSON (got {len(text)} chars)")
     return obj.get("resume_markdown", ""), obj.get("cover_letter", "")
+
+
+def _extract_json_object(text):
+    """Find and parse the first complete top-level {...} object in text,
+    tracking brace depth and string/escape state properly instead of a
+    greedy regex — a regex matching first-'{' to last-'}' breaks the moment
+    the model's reply has anything after the real object (trailing
+    commentary, a second JSON-looking block, etc.), which reads to json.loads
+    as 'Extra data' even though the actual object was perfectly valid."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start:i + 1]
+                try:
+                    return json.loads(candidate)
+                except Exception:
+                    return None
+    return None
 
 
 # --------------------------------------------------------------------------- #
