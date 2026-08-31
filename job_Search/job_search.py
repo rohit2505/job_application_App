@@ -53,12 +53,12 @@ DEFAULT_SEEN_FILE = "state/seen.json"
 COMPANIES_FILE = "companies.json"
 
 ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
-               "jsearch", "greenhouse", "lever", "ashby"]
+               "jsearch", "himalayas", "greenhouse", "lever", "ashby"]
 
 # What runs by default: the aggregators + JSearch. The company ATS boards
 # (greenhouse/lever/ashby) are OFF by default — enable with --sources if wanted.
-DEFAULT_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse",
-                   "remoteok", "jsearch"]
+DEFAULT_SOURCES = ["remotive", "arbeitnow", "jobicy", "muse",
+                   "remoteok", "jsearch", "himalayas"]
 
 # ==========================================================================  #
 #  LOCAL TESTING KEYS  —  paste your keys here to run on your own machine.
@@ -763,6 +763,35 @@ def fetch_remoteok(query, now, window_min):
     return out
 
 
+def fetch_himalayas(query, now, window_min):
+    # Free, public, no API key/quota — https://himalayas.app/docs/remote-jobs-api
+    # applicationLink points to Himalayas' own apply page (not a third-party
+    # redirect gate like Adzuna's), so it should be reachable by Playwright.
+    url = "https://himalayas.app/jobs/api?" + urllib.parse.urlencode({"limit": 100})
+    out = []
+    data = get_json(url)
+    rows = data.get("jobs", data) if isinstance(data, dict) else data
+    for j in (rows or []):
+        if not isinstance(j, dict):
+            continue
+        posted = parse_epoch(j.get("pubDate"))
+        if not in_window(posted, now, window_min):
+            continue
+        title = j.get("title", "")
+        desc = j.get("description", "") or j.get("excerpt", "")
+        if not matches_query(query, title, desc):
+            continue
+        loc_list = j.get("locationRestrictions") or []
+        loc = ", ".join(loc_list) if loc_list else "Remote (Worldwide)"
+        out.append(job("himalayas", title, j.get("companyName"), loc,
+                       j.get("applicationLink") or j.get("guid"),
+                       tags=j.get("categories", []), remote=True, posted=posted,
+                       no_sponsor=rejects_sponsorship(title, desc),
+                       salary_min=j.get("minSalary"), salary_max=j.get("maxSalary"),
+                       description=desc))
+    return out
+
+
 def fetch_greenhouse(query, now, window_min, companies):
     out = []
     for slug in companies:
@@ -1149,6 +1178,7 @@ def main():
             "jobicy": lambda: fetch_jobicy(q, now, w),
             "muse": lambda: fetch_muse(q, now, w, location=args.location),
             "remoteok": lambda: fetch_remoteok(q, now, w),
+            "himalayas": lambda: fetch_himalayas(q, now, w),
             "greenhouse": lambda: fetch_greenhouse(q, now, w, companies["greenhouse"]),
             "lever": lambda: fetch_lever(q, now, w, companies["lever"]),
             "ashby": lambda: fetch_ashby(q, now, w, companies["ashby"]),
