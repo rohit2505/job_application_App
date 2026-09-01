@@ -261,6 +261,87 @@ def answer_question(question, options, resume_text, profile):
     return None if text.upper() == "UNKNOWN" or not text else text
 
 
+def ai_polish_answer(question, raw_notes, resume_text, profile):
+    """Used when you reply on Telegram with 'ai: <rough notes>' instead of a
+    finished answer — turns your notes into a clear, first-person, properly
+    worded application answer, filling in supporting detail from the resume/
+    profile where relevant. Unlike answer_question(), this is allowed to use
+    whatever you typed in raw_notes even if it's not already in the resume
+    (it's YOUR answer, just under-written) — it should not invent facts
+    beyond what you or the resume/profile actually say, but it can and
+    should turn a few rough words into a proper sentence or two."""
+    key = cfg("ANTHROPIC_API_KEY")
+    if not key:
+        return None
+    prompt = (
+        "You are helping a candidate answer ONE job application screening "
+        "question. They gave you rough notes to work from — turn those "
+        "notes into a clear, professional, first-person answer (a few "
+        "sentences, no bullet points, no preamble like 'Sure, here's...'). "
+        "Use their notes as the primary source of truth; you may pull in "
+        "supporting detail from the resume/profile below if it's directly "
+        "relevant, but do not invent anything beyond what the notes, "
+        "resume, or profile actually say.\n\n"
+        f"QUESTION: {question}\n\n"
+        f"CANDIDATE'S NOTES: {raw_notes}\n\n"
+        f"RESUME:\n{resume_text[:4000]}\n\n"
+        f"PROFILE:\n{json.dumps(profile, indent=0)}\n\n"
+        "Reply with ONLY the final answer text, nothing else."
+    )
+    body = json.dumps({
+        "model": QA_MODEL, "max_tokens": 300,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+    req = urllib.request.Request(ANTHROPIC_URL, data=body, headers={
+        "x-api-key": key, "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        text = "".join(b.get("text", "") for b in data.get("content", [])).strip()
+    except Exception as e:
+        print(f"  [claude] ai_polish_answer error: {e}", file=sys.stderr)
+        return None
+    return text or None
+
+
+# Telegram reply phrases that ask the AI to just answer for you, straight
+# from your resume/profile (no extra notes given) — same call as the
+# original auto-attempt (answer_question), so it's only useful if that
+# first attempt was wrong to give up, or you want it to try again.
+_AI_ANSWER_PHRASES = {"ai", "ai answer", "ai answer it", "you answer",
+                       "you answer it", "answer it", "let ai answer"}
+
+
+def resolve_telegram_reply(reply, question, resume_text, profile):
+    """Reply text as typed on Telegram may itself be the final answer, or it
+    may be a request to have the AI answer/polish it:
+      - bare phrases like "ai" / "answer it" -> re-run answer_question()
+        straight from resume/profile (no new info from you).
+      - "ai: <notes>" or "ai <notes>" -> ai_polish_answer() turns your rough
+        notes into a proper answer.
+      - anything else -> used exactly as typed, unchanged (current behavior).
+    Returns (final_answer, source_tag). Falls back to the raw reply (or the
+    raw notes, for the 'ai: <notes>' form) if the AI call fails for any
+    reason, so a bad/missing ANTHROPIC_API_KEY never blocks the reply."""
+    stripped = reply.strip()
+    lower = stripped.lower()
+    if lower in _AI_ANSWER_PHRASES:
+        ai_ans = answer_question(question, None, resume_text, profile)
+        if ai_ans:
+            return ai_ans, "telegram+ai"
+        return stripped, "telegram"  # AI couldn't confidently answer either — use literally what you typed
+    if lower.startswith("ai:") or lower.startswith("ai "):
+        raw_notes = stripped[3:].lstrip(": ").strip()
+        if raw_notes:
+            ai_ans = ai_polish_answer(question, raw_notes, resume_text, profile)
+            if ai_ans:
+                return ai_ans, "telegram+ai"
+            return raw_notes, "telegram"
+    return stripped, "telegram"
+
+
 # --------------------------------------------------------------------------- #
 # Greenhouse form handling (Playwright)
 # --------------------------------------------------------------------------- #
@@ -590,12 +671,25 @@ def _is_lever_url(url):
 def find_lever_form(page):
     """Lever's application form is the page itself (not an iframe, unlike
     Greenhouse) — confirmed live against a real Lever board. Detected by
-    hostname plus the presence of the standard resume file input, so a
-    lever.co page that's just the job description (not yet on /apply)
-    doesn't get mistaken for the form."""
+    hostname plus the presence of the standard resume file input.
+
+    IMPORTANT: a lever.co posting resolves to the job DESCRIPTION page
+    (jobs.lever.co/<company>/<id>), which never has the form on it — the
+    real application form lives at a separate .../apply URL. Confirmed live
+    (2026-09) after this silently misreported every un-navigated Lever
+    posting as 'not_greenhouse' (not a real ATS-support gap, just never
+    reaching the form). So: check the current page first, and if it's a
+    lever.co URL without the form, navigate to '<url>/apply' (unless we're
+    already there) before giving up."""
     try:
         if not _is_lever_url(page.url):
             return None
+        if page.locator("input[name='resume']").count() > 0:
+            return page.main_frame
+        base_url = page.url.rstrip("/")
+        if base_url.endswith("/apply"):
+            return None  # already tried the apply page and the form isn't there
+        page.goto(base_url + "/apply", wait_until="domcontentloaded", timeout=15000)
         if page.locator("input[name='resume']").count() > 0:
             return page.main_frame
     except Exception:
@@ -906,11 +1000,13 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
             reply = wait_for_whatsapp_reply(asked_at)
             if not reply:
                 return "unanswered", log, None
-            item["answer"], item["source"] = reply, "telegram"
+            final_answer, source_tag = resolve_telegram_reply(
+                reply, item["question"], resume_text, profile)
+            item["answer"], item["source"] = final_answer, source_tag
             try:
                 el = frame.get_by_label(item["question"]).first
                 if el.count():
-                    el.fill(reply)
+                    el.fill(final_answer)
             except Exception:
                 pass
 
@@ -1074,6 +1170,30 @@ def _check_listing_freshness(page, job, log):
     return False
 
 
+def _captcha_present_with_retry(page, frame, attempts=3, wait_ms=1500):
+    """Recaptcha/hCaptcha widgets are sometimes injected into the DOM
+    asynchronously by the ATS's own JS a beat after the page finishes
+    loading — a single instantaneous check can miss one that only appears
+    moments later. Confirmed live (2026-09, MrBeast + DoorDash Greenhouse
+    postings): the initial has_captcha() check found nothing, so the form
+    got filled and a screening question got escalated to Telegram — only
+    for the SECOND has_captcha() check (right before submit) to correctly
+    catch the now-loaded widget and block submission. Correct outcome
+    (never submits past a captcha), but wastes your time answering a
+    question for an application that was never going to go through. Poll a
+    few times with a short wait up front so we bail out BEFORE asking you
+    anything, instead of after."""
+    for i in range(attempts):
+        if has_captcha(frame):
+            return True
+        if i < attempts - 1:
+            try:
+                page.wait_for_timeout(wait_ms)
+            except Exception:
+                break
+    return False
+
+
 def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_path, cover_path, log):
     if rstatus == "redirect_failed":
         shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_redirect_failed.png"
@@ -1089,14 +1209,14 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
 
     frame = find_greenhouse_frame(page)
     if frame:
-        if has_captcha(frame):
+        if _captcha_present_with_retry(page, frame):
             return "captcha", log, None
         fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log)
 
     lever_frame = find_lever_form(page)
     if lever_frame:
-        if has_captcha(lever_frame):
+        if _captcha_present_with_retry(page, lever_frame):
             return "captcha", log, None
         fill_lever_form(lever_frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, lever_frame, job, profile, resume_text, resume_path, cover_path, log)

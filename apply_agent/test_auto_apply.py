@@ -570,6 +570,41 @@ class LeverSupportTests(unittest.TestCase):
                                                    "/tmp/x.docx", "/tmp/x.docx")
         self.assertEqual(status, "applied")
 
+    def test_find_lever_form_navigates_to_apply_page_when_description_page_has_no_form(self):
+        """Regression for the 2026-09 bug: a Lever posting resolves to the
+        job DESCRIPTION page (.../<id>), which never has the form on it —
+        the real form lives at a separate .../<id>/apply URL. This was
+        previously silently misreported as 'not_greenhouse'."""
+        ctx = FakeContext(no_popup=True)
+
+        def _on_goto(pg, url):
+            pg.url = url
+            pg.frames = [FakeFrame(url)]
+            pg._locator_cache = {}  # fresh "page" — don't reuse the old count
+            pg._locator_counts = {"input[name='resume']": 1 if url.endswith("/apply") else 0}
+
+        page = FakePage(start_url="https://jobs.lever.co/acme/xyz", context=ctx, on_goto=_on_goto)
+        page._locator_counts = {"input[name='resume']": 0}  # description page: no form yet
+
+        frame = aa.find_lever_form(page)
+        self.assertIsNotNone(frame)
+        self.assertTrue(page.url.endswith("/apply"), page.url)
+
+    def test_find_lever_form_returns_none_if_apply_page_also_has_no_form(self):
+        ctx = FakeContext(no_popup=True)
+
+        def _on_goto(pg, url):
+            pg.url = url
+            pg.frames = [FakeFrame(url)]
+            pg._locator_cache = {}
+            pg._locator_counts = {"input[name='resume']": 0}
+
+        page = FakePage(start_url="https://jobs.lever.co/acme/xyz", context=ctx, on_goto=_on_goto)
+        page._locator_counts = {"input[name='resume']": 0}
+
+        frame = aa.find_lever_form(page)
+        self.assertIsNone(frame)
+
 
 class AppliedStateTests(unittest.TestCase):
     """Status -> permanent-seen mapping (item 8/9 of the fix request)."""
@@ -606,6 +641,98 @@ class ApplyToJobRedirectFailedTests(unittest.TestCase):
         self.assertEqual(diag_entries[0]["resolved_status"], "redirect_failed")
         self.assertIn("frame_urls", diag_entries[0])
         self.assertIn("actions", diag_entries[0])
+
+
+class CaptchaRetryTimingTests(unittest.TestCase):
+    """Regression for the 2026-09 MrBeast/DoorDash incidents: a recaptcha
+    widget injected into the DOM a beat after page load must be caught
+    BEFORE any screening question gets escalated to Telegram, not just on
+    the later pre-submit re-check."""
+
+    def test_captcha_appearing_on_second_check_is_still_caught(self):
+        calls = {"n": 0}
+
+        class StubFrame:
+            def locator(self, selector):
+                calls["n"] += 1
+                present = calls["n"] >= 2  # missing on check 1, present on check 2
+                return FakeLocator(visible=present, count_override=1 if present else 0)
+
+        class StubPage:
+            def wait_for_timeout(self, ms):
+                pass
+
+        self.assertTrue(aa._captcha_present_with_retry(StubPage(), StubFrame(),
+                                                         attempts=3, wait_ms=0))
+        self.assertEqual(calls["n"], 2)
+
+    def test_no_captcha_across_all_attempts_returns_false(self):
+        class StubFrame:
+            def locator(self, selector):
+                return FakeLocator(visible=False, count_override=0)
+
+        class StubPage:
+            def wait_for_timeout(self, ms):
+                pass
+
+        self.assertFalse(aa._captcha_present_with_retry(StubPage(), StubFrame(),
+                                                          attempts=3, wait_ms=0))
+
+
+class ResolveTelegramReplyTests(unittest.TestCase):
+    """Lets a Telegram reply ask the AI to answer/polish instead of the
+    candidate typing the final answer themselves."""
+
+    def setUp(self):
+        self._orig_answer = aa.answer_question
+        self._orig_polish = aa.ai_polish_answer
+
+    def tearDown(self):
+        aa.answer_question = self._orig_answer
+        aa.ai_polish_answer = self._orig_polish
+
+    def test_bare_ai_phrase_reruns_answer_question(self):
+        aa.answer_question = lambda q, o, r, p: "Yes, I have."
+        final, source = aa.resolve_telegram_reply("ai", "Have you done X?", "resume", {})
+        self.assertEqual(final, "Yes, I have.")
+        self.assertEqual(source, "telegram+ai")
+
+    def test_bare_ai_phrase_falls_back_to_literal_text_if_ai_cannot_answer(self):
+        aa.answer_question = lambda q, o, r, p: None
+        final, source = aa.resolve_telegram_reply("answer it", "Have you done X?", "resume", {})
+        self.assertEqual(final, "answer it")
+        self.assertEqual(source, "telegram")
+
+    def test_ai_colon_notes_gets_polished(self):
+        aa.ai_polish_answer = lambda q, notes, r, p: f"Polished: {notes}"
+        final, source = aa.resolve_telegram_reply(
+            "ai: built the onboarding flow from scratch at my last job",
+            "Have you designed a feature from scratch?", "resume", {})
+        self.assertEqual(final, "Polished: built the onboarding flow from scratch at my last job")
+        self.assertEqual(source, "telegram+ai")
+
+    def test_ai_space_notes_also_works(self):
+        aa.ai_polish_answer = lambda q, notes, r, p: f"Polished: {notes}"
+        final, source = aa.resolve_telegram_reply(
+            "ai built the onboarding flow", "Have you designed a feature from scratch?",
+            "resume", {})
+        self.assertEqual(final, "Polished: built the onboarding flow")
+        self.assertEqual(source, "telegram+ai")
+
+    def test_ai_colon_falls_back_to_raw_notes_if_polish_fails(self):
+        aa.ai_polish_answer = lambda q, notes, r, p: None
+        final, source = aa.resolve_telegram_reply(
+            "ai: built the onboarding flow", "Have you designed a feature from scratch?",
+            "resume", {})
+        self.assertEqual(final, "built the onboarding flow")
+        self.assertEqual(source, "telegram")
+
+    def test_plain_reply_used_verbatim(self):
+        final, source = aa.resolve_telegram_reply(
+            "Yes, at my last company I built the whole reporting pipeline.",
+            "Have you done X?", "resume", {})
+        self.assertEqual(final, "Yes, at my last company I built the whole reporting pipeline.")
+        self.assertEqual(source, "telegram")
 
 
 if __name__ == "__main__":
