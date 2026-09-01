@@ -604,51 +604,68 @@ def find_lever_form(page):
 
 
 def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log):
-    # Standard fields
-    def try_fill(selector, value):
+    """Fills Greenhouse's standalone job-boards.greenhouse.io application
+    form. IMPORTANT: as of 2026-09, this UI's inputs carry the field's
+    identity in `id` (first_name, last_name, email, phone, country,
+    candidate-location, resume, cover_letter, question_<num>) with `name`
+    left EMPTY — confirmed via live DOM inspection after a real submission
+    went out completely blank (name-only selectors matched zero elements,
+    silently, with no error). Selectors below try id first, name second,
+    so this also still works if a posting is on the older name-based
+    embed. See _finish_application for the fill-verification gate that
+    now refuses to submit unless this actually took."""
+    def try_fill(field_id, name_attr, value):
         if not value:
-            return
-        try:
-            el = frame.locator(selector).first
-            if el.count():
-                el.fill(str(value))
-        except Exception:
-            pass
+            return False
+        for selector in (f"#{field_id}", f"input[name='{name_attr}']"):
+            try:
+                el = frame.locator(selector).first
+                if el.count():
+                    el.fill(str(value))
+                    return True
+            except Exception:
+                continue
+        return False
 
-    try_fill("input[name='first_name']", profile.get("first_name"))
-    try_fill("input[name='last_name']", profile.get("last_name"))
-    try_fill("input[name='email']", profile.get("email"))
-    try_fill("input[name='phone']", profile.get("phone"))
-    try_fill("input[name='country']", profile.get("country"))
+    try_fill("first_name", "first_name", profile.get("first_name"))
+    try_fill("last_name", "last_name", profile.get("last_name"))
+    try_fill("email", "email", profile.get("email"))
+    try_fill("phone", "phone", profile.get("phone"))
+    try_fill("country", "country", profile.get("country"))
     loc = ", ".join(x for x in (profile.get("location_city"), profile.get("location_state")) if x)
-    try_fill("input[name='candidate-location']", loc)
+    try_fill("candidate-location", "candidate-location", loc)
 
     # Resume / cover letter uploads
-    for name, path in (("resume", resume_path), ("cover_letter", cover_path)):
+    for field_id, path in (("resume", resume_path), ("cover_letter", cover_path)):
         if not path or not os.path.exists(path):
             continue
-        try:
-            el = frame.locator(f"input[name='{name}']").first
-            if el.count():
-                el.set_input_files(path)
-        except Exception:
-            pass
+        for selector in (f"#{field_id}", f"input[name='{field_id}']"):
+            try:
+                el = frame.locator(selector).first
+                if el.count():
+                    el.set_input_files(path)
+                    break
+            except Exception:
+                continue
 
     # Label-keyword-matched text fields (LinkedIn, website, how-did-you-hear, etc.)
+    # — Greenhouse's custom questions are input#question_<num> with empty
+    # name, so match on id, falling back to name for the older UI.
     try:
         inputs = frame.locator("input[type='text']")
         n = inputs.count()
         for i in range(n):
             el = inputs.nth(i)
+            el_id = el.get_attribute("id") or ""
             name = el.get_attribute("name") or ""
-            if name in ("first_name", "last_name", "email", "phone", "country",
-                        "candidate-location") or not name.startswith("question_"):
+            identity = el_id or name
+            if identity in ("first_name", "last_name", "email", "phone", "country",
+                            "candidate-location") or not identity.startswith("question_"):
                 continue
             label_text = ""
             try:
-                lbl_id = el.get_attribute("id")
-                if lbl_id:
-                    lbl = frame.locator(f"label[for='{lbl_id}']").first
+                if el_id:
+                    lbl = frame.locator(f"label[for='{el_id}']").first
                     if lbl.count():
                         label_text = (lbl.inner_text() or "").strip()
             except Exception:
@@ -680,11 +697,11 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
         groups = {}
         for i in range(n):
             el = checkboxes.nth(i)
-            name = el.get_attribute("name") or ""
-            if not name:
+            key = el.get_attribute("name") or el.get_attribute("id") or ""
+            if not key:
                 continue
-            groups.setdefault(name, []).append(el)
-        for name, els in groups.items():
+            groups.setdefault(key, []).append(el)
+        for key, els in groups.items():
             options = []
             for el in els:
                 try:
@@ -700,7 +717,7 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                     fieldset_label = fs.inner_text().strip()
             except Exception:
                 pass
-            question = fieldset_label or name
+            question = fieldset_label or key
             opt_names = [o for o, _ in options if o]
             ans = answer_question(question, opt_names, resume_text, profile)
             if ans:
@@ -716,6 +733,33 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                 log.append({"question": question, "answer": None, "source": "unanswered"})
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
+
+
+def _required_fields_actually_filled(frame, profile):
+    """Verify the fields we just tried to fill really hold a value, before
+    ever clicking submit. Checks id first (current Greenhouse UI), name
+    second (older embed) — same fallback order as try_fill above."""
+    checks = [
+        ("first_name", "first_name", profile.get("first_name")),
+        ("last_name", "last_name", profile.get("last_name")),
+        ("email", "email", profile.get("email")),
+    ]
+    for field_id, name_attr, expected in checks:
+        if not expected:
+            continue
+        got = ""
+        for selector in (f"#{field_id}", f"input[name='{name_attr}']"):
+            try:
+                el = frame.locator(selector).first
+                if el.count():
+                    got = (el.input_value() or "").strip()
+                    if got:
+                        break
+            except Exception:
+                continue
+        if not got:
+            return False
+    return True
 
 
 def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, log):
@@ -873,6 +917,19 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
     if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
         return "captcha", log, None
 
+    # Never submit unless the required fields genuinely took a value — this
+    # is what a completely blank real submission to Incident IQ (2026-09-01)
+    # taught the hard way: a selector mismatch silently filled nothing, and
+    # the old code still clicked submit and called it "applied". Only
+    # checked for Greenhouse (has an id-based verifier); Lever's fields are
+    # standard `name`-based and were verified live already.
+    if find_greenhouse_frame(page) is frame or (frame is page.main_frame and "greenhouse.io" in page.url):
+        if not _required_fields_actually_filled(frame, profile):
+            log.append({"error": "required fields (first/last name, email) did not "
+                                  "verify as filled after fill_greenhouse_form — refusing "
+                                  "to submit a blank application"})
+            return "fill_failed", log, None
+
     shot_path = None
     try:
         submit = frame.get_by_role("button", name=re.compile("submit", re.I)).first
@@ -881,6 +938,20 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
             page.wait_for_timeout(3000)
             shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_confirmation.png"
             page.screenshot(path=shot_path, full_page=True)
+            # Verify the click actually went through — if the same submit
+            # button is still visible, the form almost certainly rejected
+            # the submission (client-side validation on a missing/invalid
+            # required field) and we're still looking at the same page.
+            # Never claim "applied" just because a click event fired.
+            try:
+                still_there = frame.get_by_role("button", name=re.compile("submit", re.I)).first
+                if still_there.count() and still_there.is_visible():
+                    log.append({"error": "submit button still visible after click — "
+                                          "submission was likely rejected client-side "
+                                          "(validation error), not confirmed as applied"})
+                    return "submit_unconfirmed", log, shot_path
+            except Exception:
+                pass  # frame/page navigated away entirely — that's the success case
             return "applied", log, shot_path
     except Exception as e:
         log.append({"error": str(e)})
@@ -1193,6 +1264,12 @@ def main():
                     "stale_listing": "the company's own posting date is much older than "
                                       "the source claimed — likely a stale re-index, "
                                       "skipped rather than wasting an application",
+                    "fill_failed": "required fields (name/email) did not verify as filled "
+                                    "after the form-fill pass — refused to submit blank, "
+                                    "retryable (may be a selector mismatch to fix)",
+                    "submit_unconfirmed": "clicked submit but the button/form was still "
+                                          "there afterward — likely rejected client-side, "
+                                          "not confirmed as a real submission",
                     "captcha": "CAPTCHA present — will not auto-submit",
                     "unanswered": "a screening question couldn't be answered "
                                   "(Claude was unsure, and Telegram reply didn't "

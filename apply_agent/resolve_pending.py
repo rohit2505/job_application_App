@@ -238,6 +238,10 @@ def main():
                 aa.send_whatsapp(f"✅ Auto-applied to {title} @ {company} using the link you sent!")
             else:
                 reason = {
+                    "fill_failed": "required fields did not verify as filled — refused "
+                                    "to submit blank, retryable.",
+                    "submit_unconfirmed": "submit button/form was still there after "
+                                          "clicking — likely rejected client-side.",
                     "stale_listing": "the company's own posting date is much older than "
                                       "the source claimed — likely stale, skipped.",
                     "not_greenhouse": "that page isn't a Greenhouse or Lever form — "

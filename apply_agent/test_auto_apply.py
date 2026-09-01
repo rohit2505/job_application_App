@@ -36,11 +36,14 @@ def _no_meta_refresh(url, timeout_s=15):
 # module actually touches.
 # --------------------------------------------------------------------------- #
 class FakeLocator:
-    def __init__(self, visible=False, raises_on_click=None, count_override=None):
+    def __init__(self, visible=False, raises_on_click=None, count_override=None,
+                 hide_after_click=False):
         self._visible = visible
         self._raises_on_click = raises_on_click
         self.clicked = False
         self._count_override = count_override
+        self._hide_after_click = hide_after_click
+        self._value = ""
 
     @property
     def first(self):
@@ -56,12 +59,20 @@ class FakeLocator:
         self.clicked = True
         if self._raises_on_click:
             raise self._raises_on_click
+        if self._hide_after_click:
+            # simulates a successful submit navigating away / the form
+            # disappearing — as opposed to a rejected submit where the
+            # button stays put (see _finish_application's post-click check)
+            self._visible = False
 
     def count(self):
         return self._count_override if self._count_override is not None else (1 if self._visible else 0)
 
     def fill(self, value):
-        pass
+        self._value = value
+
+    def input_value(self):
+        return self._value
 
     def set_input_files(self, path):
         pass
@@ -129,12 +140,22 @@ class FakePage:
         # Test-configurable: self._locator_counts maps selector substrings
         # to a count, defaulting to 0 (element not present) for anything
         # unconfigured — safe for fill routines that best-effort skip
-        # absent optional fields.
+        # absent optional fields. Cached by exact selector string so a
+        # later .locator(same selector).input_value() sees what an earlier
+        # .locator(same selector).fill(...) actually set — real Playwright
+        # locators aren't the same object either, but they resolve to the
+        # same live DOM element, which is the behavior that matters here.
+        cache = self.__dict__.setdefault("_locator_cache", {})
+        if selector in cache:
+            return cache[selector]
         counts = getattr(self, "_locator_counts", {})
+        loc = FakeLocator(visible=False, count_override=0)
         for key, n in counts.items():
             if key in selector:
-                return FakeLocator(visible=n > 0, count_override=n)
-        return FakeLocator(visible=False, count_override=0)
+                loc = FakeLocator(visible=n > 0, count_override=n)
+                break
+        cache[selector] = loc
+        return loc
 
     @property
     def main_frame(self):
@@ -424,6 +445,83 @@ class ListingFreshnessTests(unittest.TestCase):
         self.assertIn("stale_listing", aa.PERMANENT_STATUSES)
 
 
+class GreenhouseFillVerificationTests(unittest.TestCase):
+    """Regression coverage for the 2026-09-01 incident: a real submission
+    to Incident IQ went out completely blank. Root cause was Greenhouse's
+    current job-boards.greenhouse.io UI using id-based fields with an
+    EMPTY name attribute — old name-only selectors matched nothing,
+    silently, and the code still clicked submit and called it "applied"."""
+
+    def _gh_page(self, submit_visible=True, id_selectors_present=True):
+        ctx = FakeContext(no_popup=True)
+        # job-boards.greenhouse.io's form is NOT in an iframe (unlike the
+        # classic embed) — model that with an on_goto that leaves frames
+        # empty (resolve_real_url calls page.goto() even for an
+        # already-direct URL), so find_greenhouse_frame falls through to
+        # its page.main_frame fallback, same as a real standalone page.
+        def _on_goto(pg, url):
+            pg.url = url
+            pg.frames = []
+        page = FakePage(start_url="https://job-boards.greenhouse.io/acme/jobs/1",
+                         context=ctx, on_goto=_on_goto)
+        page.frames = []
+        if id_selectors_present:
+            # Only id-based selectors "exist" — models the real current UI
+            # where input[name='first_name'] etc. match zero elements.
+            page._locator_counts = {"#first_name": 1, "#last_name": 1, "#email": 1}
+        else:
+            page._locator_counts = {}
+        submit_locator = FakeLocator(visible=submit_visible, hide_after_click=True)
+        page.get_by_role = lambda role, name=None: submit_locator
+        return page
+
+    def test_id_based_fields_get_filled_and_verified(self):
+        page = self._gh_page()
+        frame = page.main_frame
+        profile = {"first_name": "Jane", "last_name": "Doe", "email": "jane@example.com"}
+        aa.fill_greenhouse_form(frame, {}, profile, "", None, None, [])
+        self.assertTrue(aa._required_fields_actually_filled(frame, profile))
+
+    def test_name_only_selectors_fail_verification_not_silently_applied(self):
+        # This is the exact bug: id selectors don't exist on this fake page
+        # (simulating the case where fill matched nothing), so verification
+        # must catch it rather than let a blank submit through.
+        page = self._gh_page(id_selectors_present=False)
+        frame = page.main_frame
+        profile = {"first_name": "Jane", "last_name": "Doe", "email": "jane@example.com"}
+        aa.fill_greenhouse_form(frame, {}, profile, "", None, None, [])
+        self.assertFalse(aa._required_fields_actually_filled(frame, profile))
+
+    def test_blank_form_never_reaches_applied_status(self):
+        page = self._gh_page(id_selectors_present=False)
+        job = {"url": page.url, "company": "Acme", "title": "Engineer"}
+        profile = {"first_name": "Jane", "last_name": "Doe", "email": "jane@example.com"}
+        status, log, screenshot = aa.apply_to_job(page, job, profile, "", None, None)
+        self.assertEqual(status, "fill_failed")
+        self.assertNotIn("fill_failed", aa.PERMANENT_STATUSES)  # must stay retry-eligible
+
+    def test_properly_filled_form_reaches_applied_status(self):
+        page = self._gh_page(id_selectors_present=True)
+        job = {"url": page.url, "company": "Acme", "title": "Engineer"}
+        profile = {"first_name": "Jane", "last_name": "Doe", "email": "jane@example.com"}
+        status, log, screenshot = aa.apply_to_job(page, job, profile, "", None, None)
+        self.assertEqual(status, "applied")
+
+    def test_submit_button_still_visible_after_click_is_unconfirmed(self):
+        # Fields filled fine, but the submit button never disappears after
+        # click — models Greenhouse's client-side validation silently
+        # rejecting the submission and keeping the same page up.
+        page = self._gh_page(id_selectors_present=True, submit_visible=True)
+        # override with a locator that does NOT hide after click
+        stuck_submit = FakeLocator(visible=True, hide_after_click=False)
+        page.get_by_role = lambda role, name=None: stuck_submit
+        job = {"url": page.url, "company": "Acme", "title": "Engineer"}
+        profile = {"first_name": "Jane", "last_name": "Doe", "email": "jane@example.com"}
+        status, log, screenshot = aa.apply_to_job(page, job, profile, "", None, None)
+        self.assertEqual(status, "submit_unconfirmed")
+        self.assertNotIn("submit_unconfirmed", aa.PERMANENT_STATUSES)
+
+
 class LeverSupportTests(unittest.TestCase):
     """Lever detection/fill/CAPTCHA-block routing (destination-side — fires
     on a lever.co URL regardless of which source found the job)."""
@@ -441,7 +539,11 @@ class LeverSupportTests(unittest.TestCase):
         page._locator_counts = {"input[name='resume']": 1}
         if extra_locator_counts:
             page._locator_counts.update(extra_locator_counts)
-        page.get_by_role = lambda role, name=None: FakeLocator(visible=submit_visible)
+        # Same instance on every get_by_role call (not a fresh one) so that
+        # clicking it can be observed on the re-check right after —
+        # hide_after_click=True models a successful submit navigating away.
+        submit_locator = FakeLocator(visible=submit_visible, hide_after_click=True)
+        page.get_by_role = lambda role, name=None: submit_locator
         return page
 
     def test_find_lever_form_detects_by_url_and_resume_field(self):
