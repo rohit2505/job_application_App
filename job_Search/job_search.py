@@ -57,8 +57,18 @@ ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
 
 # What runs by default: the aggregators + JSearch. The company ATS boards
 # (greenhouse/lever/ashby) are OFF by default — enable with --sources if wanted.
+#
+# activejobsdb is OFF by default for now too, even though it's the best
+# direct-apply source we've found (0% LinkedIn noise vs. Techmap's 90%) —
+# its RapidAPI free tier is only 250 jobs/month TOTAL, and job_search.py
+# calls each source once per query in JOB_QUERY (currently 7 queries), so a
+# single real run could request up to 7x its per-call limit and blow the
+# entire month's quota in one shot. Re-add it here once either (a) you've
+# upgraded to a paid Active Jobs DB tier, or (b) JOB_QUERY is down to a
+# single query and you're deliberately budgeting the free tier around it.
+# In the meantime: --sources activejobsdb for a one-off manual pull.
 DEFAULT_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse",
-                   "remoteok", "jsearch", "himalayas", "activejobsdb"]
+                   "remoteok", "jsearch", "himalayas"]
 
 # ==========================================================================  #
 #  LOCAL TESTING KEYS  —  paste your keys here to run on your own machine.
