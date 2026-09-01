@@ -1,0 +1,1278 @@
+{
+  "api": "Techmap.io Job Posting API",
+  "apiVersion": "v2.6",
+  "apiEndpoint": "GET search result for Job Postings by countryCode, dateCreated, language, industry, timezone, workPlace, etc.",
+  "page": 1,
+  "pageSize": 10,
+  "totalCount": 86,
+  "query": {
+    "query": {
+      "bool": {
+        "must": [
+          {
+            "range": {
+              "dateCreated": {
+                "gte": "2026-08-30T00:00:00.000Z",
+                "lte": "2026-08-30T23:59:59.999Z"
+              }
+            }
+          },
+          {
+            "match": {
+              "countryCode": "us"
+            }
+          },
+          {
+            "bool": {
+              "should": [
+                {
+                  "match": {
+                    "title": "data"
+                  }
+                },
+                {
+                  "match": {
+                    "title": "engineer"
+                  }
+                }
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          {
+            "match": {
+              "workPlace": "remote"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "result": [
+    {
+      "isRecruiter": false,
+      "occupation": "BI Programmer",
+      "dateActive": "2026-09-30T04:04:23.461647Z",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "Construction",
+      "jsonLD": {
+        "identifier": "6a93abc76dcfba4f09b68529",
+        "validThrough": "2026-09-30",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "salaryCurrency": "USD",
+        "description": "Business Intelligence Developer -- SQL \\& Data Integration\n==========================================================\n\n**Location:** Beaufort County, SC  \n\n**Work Arrangement:** Hybrid  \n\n**Compensation:** $35.18--$41.97 per hour  \n\n**Schedule:** Full-time\n\nAbout the Opportunity\n- --------------------\n\nWe are recruiting on behalf of a mission-driven public-sector organization seeking an experienced Business Intelligence Developer -- SQL \\& Data Integration to join its data team.\n\nThis role sits at the intersection of data, technology, business process improvement, reporting, and automation. It is ideal for someone who enjoys looking at a manual or inefficient process and asking, *\"How can we make this work better through data and technology?\"*\n\nYou will work with data from existing systems and use SQL, Power BI, data integration, scripting, and automation to make information more connected, accurate, accessible, and useful across the organization.\n\nThis is more technical than a traditional Data Analyst position, but it is not a traditional Database Administrator or Data Engineer role. Rather than building or administering the organization's core source systems, you will work with available data, integrate information across systems, automate repetitive workflows, and create solutions that make day-to-day operations more efficient.\n\nWhat You'll Do\n- -------------\n\nIn this role, you will:\n\n* Develop, write, and optimize SQL queries, views, stored procedures, and parameterized scripts to improve data access and operational workflows.\n* Work with existing database structures and available back-end data to develop reliable, scalable solutions for internal users.\n* Develop a strong understanding of existing systems, data structures, relationships, and dependencies.\n* Integrate data from systems that do not naturally communicate with one another.\n* Build and maintain Power BI dashboards, reports, data models, and visualizations that provide meaningful, actionable insights.\n* Use advanced DAX and Power Query capabilities to transform and model data.\n* Automate repetitive processes and workflows using tools such as Python, PowerShell, SQL, Power Query, or similar technologies.\n* Replace manual Excel-, Word-, and click-intensive processes with more efficient, technology-driven solutions.\n* Structure and prepare data so end users receive information in a usable format with minimal manual manipulation required.\n* Identify and resolve data discrepancies to maintain accuracy, reliability, and data integrity.\n* Evaluate existing business processes and identify opportunities to reduce unnecessary steps, manual effort, and duplication.\n* Collaborate with internal stakeholders to translate business needs into practical technical solutions.\n* Coordinate with external vendors regarding data transfers, integrations, security requirements, and technical issues.\n* Evaluate emerging technologies and recommend improvements that support efficiency and scalability.\n* Share best practices and technical knowledge with other members of the data team.\n\nThe organization is specifically looking for someone who can combine technical expertise with a strong understanding of how data supports real-world business operations.\n\nWhat This Looks Like in Practice\n- -------------------------------\n\nMany of the organization's existing processes have historically required employees to export data, manipulate spreadsheets, sort information manually, or repeat the same steps each time a report or workflow is needed.\n\nYour goal will be to reduce that manual effort.\n\nInstead of simply creating another spreadsheet or macro, you may use SQL to organize and prepare the data earlier in the process, create an automated workflow, integrate data from multiple sources, or build a Power BI solution that gives users the information they need in a ready-to-use format.\n\nThe end goal is to allow employees to focus on the work that requires their expertise rather than spending time manually preparing data.\n\nWhat We're Looking For\n- ---------------------\n\nThe successful candidate will bring real-world experience working with SQL, business intelligence, data integration, and automation.\n\nQualifications include:\n\n* Approximately 5 years of experience in database development, ETL, data integration, business intelligence, data engineering, or a related area.\n* Intermediate-to-advanced SQL skills, including professional experience writing queries and working with relational databases.\n* Experience developing complex queries and working with database tables, relationships, views, stored procedures, and data transformations.\n* Strong Power BI experience, including data modeling, DAX, and Power Query.\n* Experience with ETL and data integration processes.\n* Experience using Python, PowerShell, or another scripting language for workflow or data automation.\n* Strong understanding of data quality, accuracy, consistency, and integrity.\n* Experience identifying inefficient processes and developing technical solutions to improve them.\n* Strong Microsoft Excel skills.\n* Familiarity with version-control tools such as Git.\n* Strong organizational and project-management skills.\n* Ability to manage multiple priorities in a changing environment.\n* Strong written and verbal communication skills.\n* Ability to explain technical concepts clearly to non-technical stakeholders.\n* Strong problem-solving skills, initiative, and personal accountability.\n\nA bachelor's degree in Computer Science, Data Engineering, or a related field is preferred. Equivalent professional experience may also be considered. The original role criteria call for a related bachelor's degree or eight years of equivalent experience, along with at least five years of database development, ETL, or data-engineering experience.\n\nYou May Be a Great Fit If...\n- ---------------------------\n\nYou are someone who understands that the best technical solution starts with understanding the business problem.\n\nYou enjoy asking questions such as:\n\n* Why are employees doing this manually?\n* Why are we moving the same information between systems over and over?\n* Can SQL prepare this data before it ever reaches Excel?\n* Can this workflow be automated?\n* Can Power BI provide users with what they need without rebuilding the same report each month?\n\nYou are comfortable working in an environment where systems may not always connect seamlessly and where you may need to develop creative solutions using the data and technical access available to you.\n\nYou also enjoy working with both technical and non-technical colleagues and can translate a business need into a practical data solution.\n\nWhat This Role Is --- and Isn't\n- ------------------------------\n\nThis role **is** a hands-on technical position involving:\n\n* SQL development\n* Business intelligence\n* Power BI\n* Data integration\n* Workflow automation\n* ETL\n* Data quality\n* Business process improvement\n\nThis role is not primarily:\n\n* IT help desk or technical support\n* Database administration\n* Software engineering\n* Systems administration\n* Traditional data analysis focused only on reporting\n* Full-scale data engineering or database architecture\n\nInstead, this person serves as the bridge between existing systems, available data, business processes, and the people who rely on that information.\n\nWork Environment\n- ---------------\n\nThis position is part of a collaborative data team and works with both internal stakeholders and external technology partners.\n\nThe role offers a hybrid work environment, but candidates should be located within reasonable proximity of Beaufort County, South Carolina. Candidates within the broader Beaufort, Charleston, Savannah, or Columbia region may be considered depending on their ability to meet in-person requirements.\n\nThis is not a fully remote, work-from-anywhere position.\n\nThe organization values people who demonstrate initiative, accountability, continuous learning, collaboration, and a willingness to find better ways of working. The successful candidate should be equally comfortable independently solving a technical problem and partnering with a colleague to understand why a current process is not working.\n\nCompensation\n- -----------\n\nThe anticipated compensation range for this position is:\n\n$35.18--$41.97 per hour\n\nActual compensation will be determined based on experience, qualifications, and alignment with the requirements of the role.",
+        "industry": "Construction",
+        "title": "Business Intelligence Developer \u2013 SQL & Data Integration",
+        "@context": "https://schema.org",
+        "url": "https://bosun-25f9d5ec70da.breezy.hr/p/2d9ce777472f-business-intelligence-developer-sql-data-integration",
+        "relevantOccupation": "BI Programmer",
+        "skills": [
+          "Microsoft Excel",
+          "Scalability",
+          "Macro",
+          "Powershell",
+          "Python",
+          "Sql",
+          "Relational grammar",
+          "Spreadsheet",
+          "Usability",
+          "Git",
+          "Software Engineering"
+        ],
+        "hiringOrganization": {
+          "identifier": "65f22feccf99184de055ebf9",
+          "@type": "Organization",
+          "name": "Bosun",
+          "logo": "https://gallery-cdn.breezy.hr/3f4c1b93-905f-4d92-8674-3f48ab3ba431/Bosun Logo - blue 2.jpg",
+          "@context": "https://schema.org",
+          "url": "https://bosunsolutions.com"
+        },
+        "employmentUnit": "N/A",
+        "jobLocation": {
+          "identifier": "6619488110fc2952484b6b31",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "name": "Beaufort, SC",
+          "@context": "https://schema.org"
+        },
+        "datePosted": "2026-08-30",
+        "applicantLocationRequirements": "Hybrid, Remote",
+        "sameAs": "https://bosun-25f9d5ec70da.breezy.hr/p/2d9ce777472f-business-intelligence-developer-sql-data-integration/apply"
+      },
+      "source": "breezy_us",
+      "locale": "en_US",
+      "title": "Business Intelligence Developer \u2013 SQL & Data Integration",
+      "skills": [
+        "Microsoft Excel",
+        "Scalability",
+        "Macro",
+        "Powershell",
+        "Python",
+        "Sql",
+        "Relational grammar",
+        "Spreadsheet",
+        "Usability",
+        "Git",
+        "Software Engineering"
+      ],
+      "dateCreated": "2026-08-30T04:04:23.461647Z",
+      "hasSalary": false,
+      "countryCode": "us",
+      "careerLevel": [
+        "N/A"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "company": "Bosun",
+      "isDuplicate": false,
+      "portal": "breezy",
+      "department": "N/A",
+      "isDirect": true,
+      "workPlace": [
+        "Hybrid",
+        "Remote"
+      ]
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-10-07T09:12:56.000Z",
+      "city": "Charlotte",
+      "timezone": "EDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "IT",
+      "jsonLD": {
+        "identifier": "6a93f23ed0bfac6be4c9be5a",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_100_100/B56ZuAUqmsG0AQ-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=uDL8vl_gcYDj4WENvEEQ_ttz-L-qzCYqfDwfFm3chs4",
+        "validThrough": "2026-10-07T09:12:56.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "@context": "https://schema.org",
+          "value": {
+            "minValue": "170000",
+            "@type": "QuantitativeValue",
+            "maxValue": "205000",
+            "@context": "https://schema.org",
+            "unitText": "YEAR"
+          }
+        },
+        "salaryCurrency": "USD",
+        "description": "Want to learn more about this role and Jobot? Click our Jobot logo and follow   \nour LinkedIn page!   \n\nJob details:   \n\n**A growing company with great benefits in a start-up environment.** This Jobot Job is hosted by: Kirk Morgan   \nAre you a fit? Easy Apply now by clicking the \"Easy Apply\" button   \nand sending us your resume.   \nSalary: $170,000 - $205,000 per year   \n\n**++A bit about us:++** A growing company with great benefits in a start-up environment.   \n\n**++Why join us?++** A growing company with great benefits in a start-up environment.   \n\n**++Job Details++** Job Details:   \n\nWe are seeking an experienced and passionate Sr. Software Engineer to join our dynamic Tech Services team. This is a permanent position where you will be responsible for designing, developing, and maintaining software solutions that drive our high-impact, industry-leading services. The ideal candidate will have a strong background in software engineering, with a focus on Typescript, React, SQL, and AWS. In addition, you will have extensive experience building and maintaining APIs for integration with third-party services and tools.   \n\nResponsibilities:   \n\nAs a Sr. Software Engineer, you will:   \n\n1. Design, develop, and maintain high-quality software solutions using Typescript, React, SQL, and AWS.   \n\n2. Build and maintain APIs to integrate with third-party services and tools, ensuring seamless data exchange and interoperability.   \n\n3. Collaborate with cross-functional teams to define, design, and ship new features.   \n\n4. Work on bug fixing and improving application performance.   \n\n5. Continuously discover, evaluate, and implement new technologies to maximize development efficiency.   \n\n6. Participate in code reviews to maintain a high-quality code culture.   \n\n7. Provide technical leadership, driving and performing best engineering practices to initiate, plan, and execute large-scale, cross-functional, and company-wise critical programs.   \n\n8. Identify, prioritize and execute tasks in the software development life cycle.   \n\n9. Develop tools and applications by producing clean, efficient code.   \n\nQualifications:   \n\nTo be considered for the Sr. Software Engineer position, you must have:   \n\n1. Bachelor's degree in Computer Science, Engineering, or a related field.   \n\n2. 8+ years of experience in software development with a strong command of object-oriented principles.   \n\n3. Deep understanding and experience with Typescript, React, SQL, and AWS.   \n\n4. API Design (REST, GraphQL)   \n\n5. Solid understanding of the full software development life cycle.   \n\n6. Excellent problem-solving skills, with the ability to troubleshoot complex software issues.   \n\n7. Strong communication skills, with the ability to work well in a team.   \n\n8. Ability to work independently and manage one's time effectively.   \n\n9. A passion for technology and a willingness to learn and grow.   \n\nIf you are a seasoned software engineer with a passion for technology and a knack for problem-solving, we would love to hear from you. Apply today and let's create amazing technology together!   \n\nInterested in hearing more? Easy Apply now by clicking the \"Easy Apply\" button.   \n\n~Jobot is an Equal Opportunity Employer. We provide an inclusive work environment that celebrates diversity and all qualified candidates receive consideration for employment without regard to race, color, sex, sexual orientation, gender identity, religion, national origin, age (40 and over), disability, military status, genetic information or any other basis protected by applicable federal, state, or local laws. Jobot also prohibits harassment of applicants or employees based on any of these protected categories. It is Jobot's policy to comply with all applicable federal, state and local laws respecting consideration of unemployment status in making hiring decisions.\nSometimes Jobot is required to perform background checks with your authorization. Jobot will consider qualified candidates with criminal histories in a manner consistent with any applicable federal, state, or local law regarding criminal backgrounds, including but not limited to the Los Angeles Fair Chance Initiative for Hiring and the San Francisco Fair Chance Ordinance.\nInformation collected and processed as part of your Jobot candidate profile, and any job applications, resumes, or other information you choose to submit is subject to Jobot's Privacy Policy, as well as the Jobot California Worker Privacy Notice and Jobot Notice Regarding Automated Employment Decision Tools which are available at jobot.com/legal.\nBy applying for this job, you agree to receive calls, AI-generated calls, text messages, or emails from Jobot, and/or its agents and contracted partners. Frequency varies for text messages. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages. You can reply STOP to cancel and HELP for help. You can access our privacy policy here: jobot.com/privacy-policy\n\n~**Want to learn more about this role\nand Jobot?**Click our Jobot logo and follow our LinkedIn page!",
+        "industry": "IT",
+        "title": "REMOTE Staff Software Engineer",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/remote-staff-software-engineer-at-jobot-4449249261",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 96",
+          "ReactOS",
+          "Lisp",
+          "Typescript",
+          "GraphQL",
+          "Sql",
+          "AWS",
+          "React.js",
+          "Software Engineering",
+          "Software bug"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "5fa8f6e5ffc6802ef40b8a0d",
+          "@type": "Organization",
+          "name": "Jobot",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_200_200/B56ZuAUqmsG0AI-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=7VXtLUD7gzdKDHsVd0DsLjN9awXOZaLPBnjZ45UXdG0",
+          "@context": "https://schema.org",
+          "url": "https://jobot.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "6034d9330811942f196bfbff",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Charlotte",
+            "addressRegion": "NC",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 35.223785,
+          "name": "Charlotte, NC",
+          "@context": "https://schema.org",
+          "longitude": -80.84114
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 96
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Charlotte, North Carolina, United States"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -80.84114,
+        "lat": 35.223785
+      },
+      "title": "REMOTE Staff Software Engineer",
+      "skills": [
+        "monthsOfExperience: 96",
+        "ReactOS",
+        "Lisp",
+        "Typescript",
+        "GraphQL",
+        "Sql",
+        "AWS",
+        "React.js",
+        "Software Engineering",
+        "Software bug"
+      ],
+      "dateCreated": "2026-08-30T09:02:57.000Z",
+      "timezoneOffset": -4,
+      "countryCode": "us",
+      "company": "Jobot",
+      "state": "NC",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "N/A",
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-10-07T09:12:56.000Z",
+      "minSalary": 170000,
+      "hasSalary": true,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-10-07T09:12:55.000Z",
+      "city": "Charlotte",
+      "timezone": "EDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "IT",
+      "jsonLD": {
+        "identifier": "6a93f23ed0bfac6be4c9be5b",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_100_100/B56ZuAUqmsG0AQ-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=uDL8vl_gcYDj4WENvEEQ_ttz-L-qzCYqfDwfFm3chs4",
+        "validThrough": "2026-10-07T09:12:55.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "@context": "https://schema.org",
+          "value": {
+            "minValue": "130000",
+            "@type": "QuantitativeValue",
+            "maxValue": "160000",
+            "@context": "https://schema.org",
+            "unitText": "YEAR"
+          }
+        },
+        "salaryCurrency": "USD",
+        "description": "Want to learn more about this role and Jobot? Click our Jobot logo and follow   \nour LinkedIn page!   \n\nJob details:   \n\n**A growing company with great benefits in a start-up environment.** This Jobot Job is hosted by: Kirk Morgan   \nAre you a fit? Easy Apply now by clicking the \"Easy Apply\" button   \nand sending us your resume.   \nSalary: $130,000 - $160,000 per year   \n\n**++A bit about us:++** A growing company with great benefits in a start-up environment.   \n\n**++Why join us?++** A growing company with great benefits in a start-up environment.   \n\n**++Job Details++** Job Details:   \n\nWe are seeking an experienced and passionate Sr. Software Engineer to join our dynamic Tech Services team. This is a permanent position where you will be responsible for designing, developing, and maintaining software solutions that drive our high-impact, industry-leading services. The ideal candidate will have a strong background in software engineering, with a focus on Typescript, React, SQL, and AWS. In addition, you will have extensive experience building and maintaining APIs for integration with third-party services and tools.   \n\nResponsibilities:   \n\nAs a Sr. Software Engineer, you will:   \n\n1. Design, develop, and maintain high-quality software solutions using Typescript, React, SQL, and AWS.   \n\n2. Build and maintain APIs to integrate with third-party services and tools, ensuring seamless data exchange and interoperability.   \n\n3. Collaborate with cross-functional teams to define, design, and ship new features.   \n\n4. Work on bug fixing and improving application performance.   \n\n5. Continuously discover, evaluate, and implement new technologies to maximize development efficiency.   \n\n6. Participate in code reviews to maintain a high-quality code culture.   \n\n7. Provide technical leadership, driving and performing best engineering practices to initiate, plan, and execute large-scale, cross-functional, and company-wise critical programs.   \n\n8. Identify, prioritize and execute tasks in the software development life cycle.   \n\n9. Develop tools and applications by producing clean, efficient code.   \n\nQualifications:   \n\nTo be considered for the Sr. Software Engineer position, you must have:   \n\n1. Bachelor's degree in Computer Science, Engineering, or a related field.   \n\n2. 5+ years of experience in software development with a strong command of object-oriented principles.   \n\n3. Deep understanding and experience with Typescript, React, SQL, and AWS.   \n\n4. Proven experience in API development and third-party integrations.   \n\n5. Solid understanding of the full software development life cycle.   \n\n6. Excellent problem-solving skills, with the ability to troubleshoot complex software issues.   \n\n7. Strong communication skills, with the ability to work well in a team.   \n\n8. Ability to work independently and manage one's time effectively.   \n\n9. A passion for technology and a willingness to learn and grow.   \n\nIf you are a seasoned software engineer with a passion for technology and a knack for problem-solving, we would love to hear from you. Apply today and let's create amazing technology together!   \n\nInterested in hearing more? Easy Apply now by clicking the \"Easy Apply\" button.   \n\n~Jobot is an Equal Opportunity Employer. We provide an inclusive work environment that celebrates diversity and all qualified candidates receive consideration for employment without regard to race, color, sex, sexual orientation, gender identity, religion, national origin, age (40 and over), disability, military status, genetic information or any other basis protected by applicable federal, state, or local laws. Jobot also prohibits harassment of applicants or employees based on any of these protected categories. It is Jobot's policy to comply with all applicable federal, state and local laws respecting consideration of unemployment status in making hiring decisions.\nSometimes Jobot is required to perform background checks with your authorization. Jobot will consider qualified candidates with criminal histories in a manner consistent with any applicable federal, state, or local law regarding criminal backgrounds, including but not limited to the Los Angeles Fair Chance Initiative for Hiring and the San Francisco Fair Chance Ordinance.\nInformation collected and processed as part of your Jobot candidate profile, and any job applications, resumes, or other information you choose to submit is subject to Jobot's Privacy Policy, as well as the Jobot California Worker Privacy Notice and Jobot Notice Regarding Automated Employment Decision Tools which are available at jobot.com/legal.\nBy applying for this job, you agree to receive calls, AI-generated calls, text messages, or emails from Jobot, and/or its agents and contracted partners. Frequency varies for text messages. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages. You can reply STOP to cancel and HELP for help. You can access our privacy policy here: jobot.com/privacy-policy\n\n~**Want to learn more about this role\nand Jobot?**Click our Jobot logo and follow our LinkedIn page!",
+        "industry": "IT",
+        "title": "REMOTE Sr. Software Engineer",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/remote-sr-software-engineer-at-jobot-4449246533",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 60",
+          "ReactOS",
+          "Lisp",
+          "Typescript",
+          "Sql",
+          "AWS",
+          "React.js",
+          "Software Engineering",
+          "Software bug"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "5fa8f6e5ffc6802ef40b8a0d",
+          "@type": "Organization",
+          "name": "Jobot",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_200_200/B56ZuAUqmsG0AI-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=7VXtLUD7gzdKDHsVd0DsLjN9awXOZaLPBnjZ45UXdG0",
+          "@context": "https://schema.org",
+          "url": "https://jobot.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "6034d9330811942f196bfbff",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Charlotte",
+            "addressRegion": "NC",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 35.223785,
+          "name": "Charlotte, NC",
+          "@context": "https://schema.org",
+          "longitude": -80.84114
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 60
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Charlotte, North Carolina, United States"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -80.84114,
+        "lat": 35.223785
+      },
+      "title": "REMOTE Sr. Software Engineer",
+      "skills": [
+        "monthsOfExperience: 60",
+        "ReactOS",
+        "Lisp",
+        "Typescript",
+        "Sql",
+        "AWS",
+        "React.js",
+        "Software Engineering",
+        "Software bug"
+      ],
+      "dateCreated": "2026-08-30T09:03:01.000Z",
+      "timezoneOffset": -4,
+      "countryCode": "us",
+      "company": "Jobot",
+      "state": "NC",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "N/A",
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-10-07T09:12:55.000Z",
+      "minSalary": 130000,
+      "hasSalary": true,
+      "careerLevel": [
+        "None"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Machine Learning Engineer",
+      "dateActive": "2026-09-29T10:11:21.000Z",
+      "city": "Greater Chicago",
+      "timezone": "CDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "Production",
+      "jsonLD": {
+        "identifier": "6a941917d0bfac6be4c9bfad",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQEeXjvtRvoV1w/company-logo_100_100/B56Z0gEWqLKsAQ-/0/1774359506020/hirewaveee_logo?e=2147483647&amp;v=beta&amp;t=h9FRktpODAn1lM_i1WFg-7qGZvBSGx0fjxH-6dYbkPY",
+        "validThrough": "2026-09-29T10:11:21.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "salaryCurrency": "USD",
+        "description": "* **Role:** Senior Machine Learning Engineer\n* **Location:** Remote\n* **Employment Type:** Full-time\n\n**Compensation:** Competitive salary commensurate with experience, qualifications, and location. **Indicative range:** $150,000 -- $250,000 (USD equivalent), plus benefits.\n\n**Role Overview**\n\nWe are hiring a Senior Machine Learning Engineer to lead the design, training, and deployment of ML systems in production. The role combines deep ML expertise with strong software engineering --- owning models from research through scaled inference.\n\n**Key Responsibilities**\n\n- Design, train, and deploy machine learning models at production scale\n\n- Lead architecture decisions for training, evaluation, and inference pipelines\n\n- Build evaluation frameworks and monitoring for model quality and drift\n\n- Partner with data engineering on training data pipelines and feature stores\n\n- Mentor junior ML engineers and contribute to ML practice\n\n- Stay current on research and bring proven techniques into production\n\n**Required Skills and Qualifications**\n\n- 5 years in machine learning engineering with production ownership\n\n- Strong Python skills and deep experience with PyTorch or TensorFlow\n\n- Experience training and serving models at scale (deep learning, LLMs, or classical ML)\n\n- Hands-on with cloud ML infrastructure (AWS Sagemaker, GCP Vertex, Databricks, or similar)\n\n- Strong software engineering fundamentals (testing, code review, system design)\n\n- Track record of shipping ML systems that delivered measurable business value\n\n**What You'll Bring**\n\n- Curiosity about how models behave and why they fail\n\n- Rigor in following guidelines and flagging ambiguity early\n\n- Strong written communication, including ability to document findings clearly\n\n- Comfort working asynchronously across time zones\n\n**What We Offer**\n\n- Fully remote, flexible work hours\n\n- Performance-based bonus structure\n\n- Annual learning \\& development stipend\n\n- Health and wellness benefits (varies by location)\n\n- Opportunity to work on high-scale, real-world impact projects\n\n**Equal Opportunity Statement**\n\nThis is an equal opportunity role. Applications are welcomed from all qualified individuals regardless of race, color, ethnicity, nationality, gender, gender identity or expression, sexual orientation, age, religion, disability, marital status, or any other characteristic protected by applicable law. All hiring decisions are based solely on qualifications, skills, and demonstrated ability.",
+        "industry": "Production",
+        "jobBenefits": "Wellness Program",
+        "title": "Senior Machine Learning Engineer (Remote)",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/senior-machine-learning-engineer-remote-at-jobs-ai-4460898057",
+        "relevantOccupation": "Machine Learning Engineer",
+        "skills": [
+          "monthsOfExperience: 60",
+          "TensorFlow",
+          "OCaml",
+          "PyTorch",
+          "Python",
+          "Deep learning",
+          "AWS",
+          "Software Engineering",
+          "Code review"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "605ddc7d99495b06251a7358",
+          "@type": "Organization",
+          "name": "Jobs Ai",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQEeXjvtRvoV1w/company-logo_200_200/B56Z0gEWqLKsAI-/0/1774359506020/hirewaveee_logo?e=2147483647&amp;v=beta&amp;t=_jaS4rlfduPk3QQ6QcPP_ouCekjMi2fLsaZnnBWeXaE",
+          "@context": "https://schema.org"
+        },
+        "responsibilities": "Engineering, Administrative, and Sales",
+        "jobLocation": {
+          "identifier": "0dc8e7273d9f2a049361dd77",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Greater Chicago",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 41.948055,
+          "name": "Greater Chicago Area",
+          "@context": "https://schema.org",
+          "longitude": -87.655754
+        },
+        "employmentUnit": "HR",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 60
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Greater Chicago Area"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -87.655754,
+        "lat": 41.948055
+      },
+      "title": "Senior Machine Learning Engineer (Remote)",
+      "skills": [
+        "monthsOfExperience: 60",
+        "TensorFlow",
+        "OCaml",
+        "PyTorch",
+        "Python",
+        "Deep learning",
+        "AWS",
+        "Software Engineering",
+        "Code review"
+      ],
+      "dateCreated": "2026-08-30T10:11:21.000Z",
+      "timezoneOffset": -5,
+      "countryCode": "us",
+      "company": "Jobs Ai",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "HR",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-09-29T10:11:21.000Z",
+      "hasSalary": false,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FlexTime",
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Machine Learning Engineer",
+      "dateActive": "2026-09-29T10:14:43.000Z",
+      "city": "Greater Los Angeles",
+      "timezone": "PDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "Production",
+      "jsonLD": {
+        "identifier": "6a941917d0bfac6be4c9bfae",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQEeXjvtRvoV1w/company-logo_100_100/B56Z0gEWqLKsAQ-/0/1774359506020/hirewaveee_logo?e=2147483647&amp;v=beta&amp;t=h9FRktpODAn1lM_i1WFg-7qGZvBSGx0fjxH-6dYbkPY",
+        "validThrough": "2026-09-29T10:14:43.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "salaryCurrency": "USD",
+        "description": "* **Role:** Senior Machine Learning Engineer\n* **Location:** Remote\n* **Employment Type:** Full-time\n\n**Compensation:** Competitive salary commensurate with experience, qualifications, and location. **Indicative range:** $150,000 -- $250,000 (USD equivalent), plus benefits.\n\n**Role Overview**\n\nWe are hiring a Senior Machine Learning Engineer to lead the design, training, and deployment of ML systems in production. The role combines deep ML expertise with strong software engineering --- owning models from research through scaled inference.\n\n**Key Responsibilities**\n\n- Design, train, and deploy machine learning models at production scale\n\n- Lead architecture decisions for training, evaluation, and inference pipelines\n\n- Build evaluation frameworks and monitoring for model quality and drift\n\n- Partner with data engineering on training data pipelines and feature stores\n\n- Mentor junior ML engineers and contribute to ML practice\n\n- Stay current on research and bring proven techniques into production\n\n**Required Skills and Qualifications**\n\n- 5 years in machine learning engineering with production ownership\n\n- Strong Python skills and deep experience with PyTorch or TensorFlow\n\n- Experience training and serving models at scale (deep learning, LLMs, or classical ML)\n\n- Hands-on with cloud ML infrastructure (AWS Sagemaker, GCP Vertex, Databricks, or similar)\n\n- Strong software engineering fundamentals (testing, code review, system design)\n\n- Track record of shipping ML systems that delivered measurable business value\n\n**What You'll Bring**\n\n- Curiosity about how models behave and why they fail\n\n- Rigor in following guidelines and flagging ambiguity early\n\n- Strong written communication, including ability to document findings clearly\n\n- Comfort working asynchronously across time zones\n\n**What We Offer**\n\n- Fully remote, flexible work hours\n\n- Performance-based bonus structure\n\n- Annual learning \\& development stipend\n\n- Health and wellness benefits (varies by location)\n\n- Opportunity to work on high-scale, real-world impact projects\n\n**Equal Opportunity Statement**\n\nThis is an equal opportunity role. Applications are welcomed from all qualified individuals regardless of race, color, ethnicity, nationality, gender, gender identity or expression, sexual orientation, age, religion, disability, marital status, or any other characteristic protected by applicable law. All hiring decisions are based solely on qualifications, skills, and demonstrated ability.",
+        "industry": "Production",
+        "jobBenefits": "Wellness Program",
+        "title": "Senior Machine Learning Engineer (Remote)",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/senior-machine-learning-engineer-remote-at-jobs-ai-4460896086",
+        "relevantOccupation": "Machine Learning Engineer",
+        "skills": [
+          "monthsOfExperience: 60",
+          "TensorFlow",
+          "OCaml",
+          "PyTorch",
+          "Python",
+          "Deep learning",
+          "AWS",
+          "Software Engineering",
+          "Code review"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "605ddc7d99495b06251a7358",
+          "@type": "Organization",
+          "name": "Jobs Ai",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQEeXjvtRvoV1w/company-logo_200_200/B56Z0gEWqLKsAI-/0/1774359506020/hirewaveee_logo?e=2147483647&amp;v=beta&amp;t=_jaS4rlfduPk3QQ6QcPP_ouCekjMi2fLsaZnnBWeXaE",
+          "@context": "https://schema.org"
+        },
+        "responsibilities": "Engineering, Administrative, and Sales",
+        "jobLocation": {
+          "identifier": "1ce9757a45274987e41bb3b1",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Greater Los Angeles",
+            "addressRegion": "CA",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 34,
+          "name": "Greater Los Angeles, CA",
+          "@context": "https://schema.org",
+          "longitude": -118.2
+        },
+        "employmentUnit": "HR",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 60
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Greater Los Angeles, California, United States"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -118.2,
+        "lat": 34
+      },
+      "title": "Senior Machine Learning Engineer (Remote)",
+      "skills": [
+        "monthsOfExperience: 60",
+        "TensorFlow",
+        "OCaml",
+        "PyTorch",
+        "Python",
+        "Deep learning",
+        "AWS",
+        "Software Engineering",
+        "Code review"
+      ],
+      "dateCreated": "2026-08-30T10:14:43.000Z",
+      "timezoneOffset": -7,
+      "countryCode": "us",
+      "company": "Jobs Ai",
+      "state": "CA",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "HR",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-09-29T10:14:43.000Z",
+      "hasSalary": false,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FlexTime",
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-09-29T09:12:55.000Z",
+      "city": "Indianapolis",
+      "timezone": "EDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "IT",
+      "jsonLD": {
+        "identifier": "6a941c905f9dd27371d7f5d3",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_100_100/B56ZuAUqmsG0AQ-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=uDL8vl_gcYDj4WENvEEQ_ttz-L-qzCYqfDwfFm3chs4",
+        "validThrough": "2026-09-29T09:12:55.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "@context": "https://schema.org",
+          "value": {
+            "minValue": "100000",
+            "@type": "QuantitativeValue",
+            "maxValue": "140000",
+            "@context": "https://schema.org",
+            "unitText": "YEAR"
+          }
+        },
+        "salaryCurrency": "USD",
+        "description": "Want to learn more about this role and Jobot? Click our Jobot logo and follow   \nour LinkedIn page!   \n\nJob details:   \n\n**100% Remote Position (U.S.) With a Rapidly Growing Company!** This Jobot Job is hosted by: Ellie Staver   \nAre you a fit? Easy Apply now by clicking the \"Easy Apply\" button   \nand sending us your resume.   \nSalary: $100,000 - $140,000 per year   \n\n**++A bit about us:++** We are a fast-growing SaaS company that builds a mission-critical, cloud-based platform used by thousands of organizations to manage daily operations, customer engagement, payments, and reporting. Our product supports high transaction volume, complex workflows, and a large, active user base. The company is privately held, profitable, and continues to invest heavily in its technology and product roadmap. Engineering plays a central role in driving innovation, scalability, and long-term growth.   \n\n**++Why join us?++**\n\n* Stable, growing product with an established customer base and long-term roadmap\n* Meaningful engineering work on a platform used daily by a large, diverse user community\n* Collaborative, low-ego team that values clean code, ownership, and thoughtful problem-solving\n* Balanced environment focused on sustainable development practices, not constant fire drills\n* Opportunity to work across legacy and modern systems, contributing to ongoing platform evolution  \n\n**++Job Details++** We're looking for a Senior Software Engineer with a strong .NET (C#) background and prior experience developing applications in PHP/Laravel. This role is ideal for someone who has transitioned from PHP into the Microsoft stack or someone who is equally comfortable working across both technologies.   \n\nYou'll play a key role in designing, developing, and maintaining backend services for a mature SaaS platform while helping support an evolving technology stack.   \n\nWhat You'll Do:   \n\n* Design, develop, and maintain scalable backend services in a SaaS environment.\n* Build new features primarily using .NET (C#) while also supporting existing PHP/Laravel applications.\n* Develop and maintain RESTful APIs and business logic.\n* Collaborate with Product, QA, and Engineering teams to deliver new functionality.\n* Review project requirements and translate technical specifications into production-quality code.\n* Troubleshoot performance, scalability, and reliability issues.\n* Participate in code reviews, sprint planning, and architectural discussions.\n* Mentor junior and mid-level developers and help drive engineering best practices.  \n\nWhat We're Looking For:   \n\n* 7+ years of software development experience\n* Strong experience with .NET (C#).\n* Previous hands-on experience developing applications with PHP/Laravel.\n* Experience with React (preferred) or Angular.\n* Experience designing and consuming RESTful APIs.\n* Strong understanding of software architecture and system design.\n* Ability to balance technical debt with business priorities.\n* Comfortable working independently in a collaborative Agile environment.  \n\nPreferred Qualifications:   \n\n* Experience working within SaaS platforms.\n* Experience modernizing or migrating legacy applications.\n* Cloud experience (Azure preferred).\n* Passion for mentoring teammates and improving engineering processes.  \n\nInterested in hearing more? Easy Apply now by clicking the \"Easy Apply\" button.   \n\n~Jobot is an Equal Opportunity Employer. We provide an inclusive work environment that celebrates diversity and all qualified candidates receive consideration for employment without regard to race, color, sex, sexual orientation, gender identity, religion, national origin, age (40 and over), disability, military status, genetic information or any other basis protected by applicable federal, state, or local laws. Jobot also prohibits harassment of applicants or employees based on any of these protected categories. It is Jobot's policy to comply with all applicable federal, state and local laws respecting consideration of unemployment status in making hiring decisions.\nSometimes Jobot is required to perform background checks with your authorization. Jobot will consider qualified candidates with criminal histories in a manner consistent with any applicable federal, state, or local law regarding criminal backgrounds, including but not limited to the Los Angeles Fair Chance Initiative for Hiring and the San Francisco Fair Chance Ordinance.\nInformation collected and processed as part of your Jobot candidate profile, and any job applications, resumes, or other information you choose to submit is subject to Jobot's Privacy Policy, as well as the Jobot California Worker Privacy Notice and Jobot Notice Regarding Automated Employment Decision Tools which are available at jobot.com/legal.\nBy applying for this job, you agree to receive calls, AI-generated calls, text messages, or emails from Jobot, and/or its agents and contracted partners. Frequency varies for text messages. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages. You can reply STOP to cancel and HELP for help. You can access our privacy policy here: jobot.com/privacy-policy\n\n~**Want to learn more about this role\nand Jobot?**Click our Jobot logo and follow our LinkedIn page!",
+        "industry": "IT",
+        "title": "Sr. Software Engineer (.NET / PHP)",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/sr-software-engineer-net-php-at-jobot-4458832735",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 84",
+          "ReactOS",
+          "Technical debt",
+          "Business logic",
+          "Lisp",
+          "Scalability",
+          "Laravel",
+          "Angular",
+          "AngularJS",
+          "Php",
+          "React.js"
+        ],
+        "hiringOrganization": {
+          "identifier": "5fa8f6e5ffc6802ef40b8a0d",
+          "@type": "Organization",
+          "name": "Jobot",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_200_200/B56ZuAUqmsG0AI-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=7VXtLUD7gzdKDHsVd0DsLjN9awXOZaLPBnjZ45UXdG0",
+          "@context": "https://schema.org",
+          "url": "https://jobot.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "606792d431734323bed6c82c",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Indianapolis",
+            "addressRegion": "IN",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 39.76845,
+          "name": "Indianapolis, IN",
+          "@context": "https://schema.org",
+          "longitude": -86.15621
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 84
+        },
+        "applicantLocationRequirements": "Remote, EDT Timezone"
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -86.15621,
+        "lat": 39.76845
+      },
+      "title": "Sr. Software Engineer (.NET / PHP)",
+      "skills": [
+        "monthsOfExperience: 84",
+        "ReactOS",
+        "Technical debt",
+        "Business logic",
+        "Lisp",
+        "Scalability",
+        "Laravel",
+        "Angular",
+        "AngularJS",
+        "Php",
+        "React.js"
+      ],
+      "dateCreated": "2026-08-30T09:12:55.000Z",
+      "timezoneOffset": -4,
+      "countryCode": "us",
+      "company": "Jobot",
+      "state": "IN",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-09-29T09:12:55.000Z",
+      "minSalary": 100000,
+      "hasSalary": true,
+      "careerLevel": [
+        "None"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-09-29T09:12:55.000Z",
+      "city": "Cincinnati",
+      "timezone": "EDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "IT",
+      "jsonLD": {
+        "identifier": "6a941c905f9dd27371d7f5d4",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_100_100/B56ZuAUqmsG0AQ-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=uDL8vl_gcYDj4WENvEEQ_ttz-L-qzCYqfDwfFm3chs4",
+        "validThrough": "2026-09-29T09:12:55.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "@context": "https://schema.org",
+          "value": {
+            "minValue": "100000",
+            "@type": "QuantitativeValue",
+            "maxValue": "140000",
+            "@context": "https://schema.org",
+            "unitText": "YEAR"
+          }
+        },
+        "salaryCurrency": "USD",
+        "description": "Want to learn more about this role and Jobot? Click our Jobot logo and follow   \nour LinkedIn page!   \n\nJob details:   \n\n**100% Remote Position (U.S.) With a Rapidly Growing Company!** This Jobot Job is hosted by: Ellie Staver   \nAre you a fit? Easy Apply now by clicking the \"Easy Apply\" button   \nand sending us your resume.   \nSalary: $100,000 - $140,000 per year   \n\n**++A bit about us:++** We are a fast-growing SaaS company that builds a mission-critical, cloud-based platform used by thousands of organizations to manage daily operations, customer engagement, payments, and reporting. Our product supports high transaction volume, complex workflows, and a large, active user base. The company is privately held, profitable, and continues to invest heavily in its technology and product roadmap. Engineering plays a central role in driving innovation, scalability, and long-term growth.   \n\n**++Why join us?++**\n\n* Stable, growing product with an established customer base and long-term roadmap\n* Meaningful engineering work on a platform used daily by a large, diverse user community\n* Collaborative, low-ego team that values clean code, ownership, and thoughtful problem-solving\n* Balanced environment focused on sustainable development practices, not constant fire drills\n* Opportunity to work across legacy and modern systems, contributing to ongoing platform evolution  \n\n**++Job Details++** We're looking for a Senior Software Engineer with a strong .NET (C#) background and prior experience developing applications in PHP/Laravel. This role is ideal for someone who has transitioned from PHP into the Microsoft stack or someone who is equally comfortable working across both technologies.   \n\nYou'll play a key role in designing, developing, and maintaining backend services for a mature SaaS platform while helping support an evolving technology stack.   \n\nWhat You'll Do:   \n\n* Design, develop, and maintain scalable backend services in a SaaS environment.\n* Build new features primarily using .NET (C#) while also supporting existing PHP/Laravel applications.\n* Develop and maintain RESTful APIs and business logic.\n* Collaborate with Product, QA, and Engineering teams to deliver new functionality.\n* Review project requirements and translate technical specifications into production-quality code.\n* Troubleshoot performance, scalability, and reliability issues.\n* Participate in code reviews, sprint planning, and architectural discussions.\n* Mentor junior and mid-level developers and help drive engineering best practices.  \n\nWhat We're Looking For:   \n\n* 7+ years of software development experience\n* Strong experience with .NET (C#).\n* Previous hands-on experience developing applications with PHP/Laravel.\n* Experience with React (preferred) or Angular.\n* Experience designing and consuming RESTful APIs.\n* Strong understanding of software architecture and system design.\n* Ability to balance technical debt with business priorities.\n* Comfortable working independently in a collaborative Agile environment.  \n\nPreferred Qualifications:   \n\n* Experience working within SaaS platforms.\n* Experience modernizing or migrating legacy applications.\n* Cloud experience (Azure preferred).\n* Passion for mentoring teammates and improving engineering processes.  \n\nInterested in hearing more? Easy Apply now by clicking the \"Easy Apply\" button.   \n\n~Jobot is an Equal Opportunity Employer. We provide an inclusive work environment that celebrates diversity and all qualified candidates receive consideration for employment without regard to race, color, sex, sexual orientation, gender identity, religion, national origin, age (40 and over), disability, military status, genetic information or any other basis protected by applicable federal, state, or local laws. Jobot also prohibits harassment of applicants or employees based on any of these protected categories. It is Jobot's policy to comply with all applicable federal, state and local laws respecting consideration of unemployment status in making hiring decisions.\nSometimes Jobot is required to perform background checks with your authorization. Jobot will consider qualified candidates with criminal histories in a manner consistent with any applicable federal, state, or local law regarding criminal backgrounds, including but not limited to the Los Angeles Fair Chance Initiative for Hiring and the San Francisco Fair Chance Ordinance.\nInformation collected and processed as part of your Jobot candidate profile, and any job applications, resumes, or other information you choose to submit is subject to Jobot's Privacy Policy, as well as the Jobot California Worker Privacy Notice and Jobot Notice Regarding Automated Employment Decision Tools which are available at jobot.com/legal.\nBy applying for this job, you agree to receive calls, AI-generated calls, text messages, or emails from Jobot, and/or its agents and contracted partners. Frequency varies for text messages. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages. You can reply STOP to cancel and HELP for help. You can access our privacy policy here: jobot.com/privacy-policy\n\n~**Want to learn more about this role\nand Jobot?**Click our Jobot logo and follow our LinkedIn page!",
+        "industry": "IT",
+        "title": "Sr. Software Engineer (.NET / PHP)",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/sr-software-engineer-net-php-at-jobot-4458839563",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 84",
+          "ReactOS",
+          "Technical debt",
+          "Business logic",
+          "Lisp",
+          "Scalability",
+          "Laravel",
+          "Angular",
+          "AngularJS",
+          "Php",
+          "React.js"
+        ],
+        "hiringOrganization": {
+          "identifier": "5fa8f6e5ffc6802ef40b8a0d",
+          "@type": "Organization",
+          "name": "Jobot",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQFcV6Kh16um4w/company-logo_200_200/B56ZuAUqmsG0AI-/0/1767384460014/jobot_logo?e=2147483647&amp;v=beta&amp;t=7VXtLUD7gzdKDHsVd0DsLjN9awXOZaLPBnjZ45UXdG0",
+          "@context": "https://schema.org",
+          "url": "https://jobot.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "60679dc131734323bed6cc32",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Cincinnati",
+            "addressRegion": "OH",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 39.1037,
+          "name": "Cincinnati, OH",
+          "@context": "https://schema.org",
+          "longitude": -84.51361
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 84
+        },
+        "applicantLocationRequirements": "Remote, EDT Timezone"
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -84.51361,
+        "lat": 39.1037
+      },
+      "title": "Sr. Software Engineer (.NET / PHP)",
+      "skills": [
+        "monthsOfExperience: 84",
+        "ReactOS",
+        "Technical debt",
+        "Business logic",
+        "Lisp",
+        "Scalability",
+        "Laravel",
+        "Angular",
+        "AngularJS",
+        "Php",
+        "React.js"
+      ],
+      "dateCreated": "2026-08-30T09:12:55.000Z",
+      "timezoneOffset": -4,
+      "countryCode": "us",
+      "company": "Jobot",
+      "state": "OH",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": true,
+      "dateExpired": "2026-09-29T09:12:55.000Z",
+      "minSalary": 100000,
+      "hasSalary": true,
+      "careerLevel": [
+        "None"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-11-02T20:25:57.000Z",
+      "city": "McLean",
+      "timezone": "EDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "IT",
+      "jsonLD": {
+        "identifier": "6a9423fb5f9dd27371d7f6a7",
+        "image": "https://media.licdn.com/dms/image/v2/D560BAQHtf0NHyUa92g/company-logo_100_100/company-logo_100_100/0/1719933220460/thomson_reuters_logo?e=2147483647&amp;v=beta&amp;t=ML9NnTk2lfPONL3Ft_HeSGyq0tQPb7SrfP_LSYjC6c0",
+        "validThrough": "2026-11-02T20:25:57.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "salaryCurrency": "USD",
+        "description": "Are you passionate about the chance to bring your analytical processing experience to a world class organization that is leading the way in both content and technology to serve and protect our citizens home and abroad? Do you have the skills necessary to design new software solutions for customers? Then Thomson Reuters Special Services (TRSS) is looking for you!   \n\n**About The Role** Thomson Reuters Special Services (TRSS) is looking for a Software Engineer to support our DoD/DoW customers. Software Engineers supporting these efforts work alongside data scientists and data engineers to develop advanced capabilities, prototype new applications, and deliver cutting edge products for high impact government missions. Success in this role requires strong technical depth, the initiative to operate with minimal direction, and the creativity to develop novel solutions.   \n\nThese positions are part of cross-functional teams that include Data Scientists, Data Engineers, Product Managers, Analysts, and other technical contributors. Software Engineers work to develop and deploy software that utilizes advanced ML/AI capabilities for mission and operational problem areas (e.g., Cyber Operations, Supply Chain Integrity, and other customer driven domains). These products are developed in collaboration with a team of Data Scientists and Data Engineers using modern development practices such as version control, automated testing, containerized deployments, code review, and iterative delivery. This is a hybrid role open to candidates in the Washington, DC area.   \n\n**Skills** Outside of contract work, TRSS Software Engineers contribute to internal innovation by participating in research and development (R\\&D), developing and maintaining shared capabilities, strengthening technical skills, and supporting business development efforts such as proof-of-concept projects and capabilities briefings. As a **Software Engineer** , you will also contribute to a variety of areas including:   \n\n* Leading projects and acting as a mentor to less experienced developers\n* Collaborating with the TRSS development team and design, implement, and deliver software solutions and data science efforts\n* Enhancing and supporting existing applications\n* Engaging the TRSS analytical staff to gather requirements, generate ideas, and develop documentation\n* Demoing new software solutions as needed  \n\n**A Note On Our Requirements** If you are excited about this role but your prior experience does not perfectly align with every qualification listed, we still encourage you to apply. TRSS is looking for self-starting, diverse candidates who thrive in collaborative environments and are eager to expand their technical horizons. **Your ability to learn quickly, take initiative, and collaborate effectively matters just as much** **as your current tech stack.** **About You** You're a good fit for the role of **Software Engineer** if you have/are:   \n\n* 3-5 years of experience with Full-Stack Application Development.\n* Experience designing, building, testing, and maintaining multi-service backend systems and supporting frontend interfaces that deliver mission-driven analytical or operational capabilities.\n* Experience with Rapid Prototyping and Capability Development: building proof-of-concept workflows, REST APIs, microservices, or decision-support tools to demonstrate and mature new software capabilities at pace with operational needs.\n* At least three years experience with the following:\n\n* Java in the Spring ecosystem (Spring Boot)\n\n* Python\n\n* JavaScript/TypeScript and a modern component-based framework (React or similar).\n\n* SQL for relational data modeling, schema design, migration management, and data extraction or transformation tasks.\n\n* Docker\n\n* Git/GitHub\n* Ability to handle sensitive, confidential, or regulated data in accordance with applicable policies and requirements.\n* Ability to interface directly with customers and stakeholders at all levels.\n* Ability to work both independently and as a member of a team. Teams may include other Software Engineers, Data Scientists, Product Managers, Subject Matter Expert Analysts, and/or Data Engineers.\n* Ability to work using modern software development practices, including shared repositories, version control, automated testing, containerization, documentation, and iterative delivery.\n* Ability to obtain and maintain a U.S. National Security Clearance.\n* U.S. Citizenship essential to comply with government contract/agency or department of Federal Government requirements.  \n\n**Preferred Qualifications**\n\n* Experience supporting DoD, intelligence community, or other government research and development programs.\n* Experience with Data Modeling and Management: designing and maintaining relational data models, writing migrations, and managing structured data across the full data lifecycle including ingestion, transformation, validation, and storage.\n* Experience with Container orchestration platforms, particularly Kubernetes, including writing and maintaining Helm charts for multi-service deployments across multiple environments.\n* Experience with AI development tools and LLM APIs, including Anthropic Claude, OpenAI, or AWS Bedrock; experience building applications that integrate LLM-based generation, retrieval-augmented generation (RAG), or vector embedding workflows.\n* Experience with data engineering practices including ETL/ELT pipeline design, vector search indexing (Elasticsearch), object storage (MinIO/S3), and schema migration tooling (Liquibase or similar).\n* Experience with machine learning concepts and frameworks, particularly embedding models, semantic similarity, and nearest-neighbor retrieval as applied in production software systems.\n* Experience supporting national security missions or developing tools for sensitive, mission-critical operational environments where data integrity, access control, and operational context carry significant real-world consequences.  \n\n**What's in it For You?**\n\n* Hybrid Work Model: We've adopted a flexible hybrid working environment for our office-based roles while delivering a seamless experience that is digitally and physically connected.\n* Flexibility \\& Work-Life Balance: Flex My Way is a set of supportive workplace policies designed to help manage personal and professional responsibilities, whether caring for family, giving back to the community, or finding time to refresh and reset. This builds upon our flexible work arrangements, including work from anywhere for up to 8 weeks per year, empowering employees to achieve a better work-life balance.\n* Career Development and Growth: By fostering a culture of continuous learning and skill development, we prepare our talent to tackle tomorrow's challenges and deliver real-world solutions. Our Grow My Way programming and skills-first approach ensures you have the tools and knowledge to grow, lead, and thrive in an AI-enabled future.\n* Industry Competitive Benefits: We offer comprehensive benefit plans to include flexible vacation, two company-wide Mental Health Days off, access to the Headspace app, retirement savings, tuition reimbursement, employee incentive programs, and resources for mental, physical, and financial wellbeing.\n* Culture: Globally recognized, award-winning reputation for inclusion and belonging, flexibility, work-life balance, and more. We live by our values: Obsess over our Customers, Compete to Win, Challenge (Y)our Thinking, Act Fast / Learn Fast, and Stronger Together.\n* Social Impact: Make an impact in your community with our Social Impact Institute. We offer employees two paid volunteer days off annually and opportunities to get involved with pro-bono consulting projects and Environmental, Social, and Governance (ESG) initiatives.\n* Making a Real-World Impact: We are one of the few companies globally that helps its customers pursue justice, truth, and transparency. Together, with the professionals and institutions we serve, we help uphold the rule of law, turn the wheels of commerce, catch bad actors, report the facts, and provide trusted, unbiased information to people all over the world.  \n\nIn the United States, Thomson Reuters offers a comprehensive benefits package to our employees. Our benefit package includes market competitive health, dental, vision, disability, and life insurance programs, as well as a competitive 401k plan with company match. In addition, Thomson Reuters offers market leading work life benefits with competitive vacation, sick and safe paid time off, paid holidays (including two company mental health days off), parental leave, sabbatical leave. These benefits meet or exceeds the requirements of paid time off in accordance with any applicable state or municipal laws. Finally, Thomson Reuters offers the following additional benefits: optional hospital, accident and sickness insurance paid 100% by the employee; optional life and AD\\&D insurance paid 100% by the employee; Flexible Spending and Health Savings Accounts; fitness reimbursement; access to Employee Assistance Program; Group Legal Identity Theft Protection benefit paid 100% by employee; access to 529 Plan; commuter benefits; Adoption \\& Surrogacy Assistance; Tuition Reimbursement; and access to Employee Stock Purchase Plan.   \n\nThomson Reuters complies with local laws that require upfront disclosure of the expected pay range for a position. The base compensation range varies across locations. Eligible office location(s) for this role include one or more of the following: New York City, San Francisco, Los Angeles, and/or Irvine, CA; McLean, VA; Washington, DC. The base compensation range for the role in any of those locations is $117,700 USD - $218,600 USD. Base pay is positioned within the range based on several factors including an individual's knowledge, skills and experience with consideration given to internal equity. Base pay is one part of a comprehensive Total Reward program which also includes flexible and supportive benefits and other wellbeing programs. This role may also be eligible for an Annual Bonus based on a combination of enterprise and individual performance.   \n\n**About Us** Thomson Reuters informs the way forward by bringing together the trusted content and technology that people and organizations need to make the right decisions. We serve professionals across legal, tax, accounting, compliance, government, and media. Our products combine highly specialized software and insights to empower professionals with the data, intelligence, and solutions needed to make informed decisions, and to help institutions in their pursuit of justice, truth, and transparency. Reuters, part of Thomson Reuters, is a world leading provider of trusted journalism and news.   \n\nWe are powered by the talents of 26,000 employees across more than 70 countries, where everyone has a chance to contribute and grow professionally in flexible work environments. At a time when objectivity, accuracy, fairness, and transparency are under attack, we consider it our duty to pursue them. Sound exciting? Join us and help shape the industries that move society forward.   \n\nAs a global business, we rely on the unique backgrounds, perspectives, and experiences of all employees to deliver on our business goals. To ensure we can do that, we seek talented, qualified employees in all our operations around the world regardless of race, color, sex/gender, including pregnancy, gender identity and expression, national origin, religion, sexual orientation, disability, age, marital status, citizen status, veteran status, or any other protected classification under applicable law. Thomson Reuters is proud to be an Equal Employment Opportunity Employer providing a drug-free workplace.   \n\nThomson Reuters makes reasonable accommodations for applicants with disabilities, including veterans with disabilities, and for sincerely held religious beliefs in accordance with applicable law. If you reside in the United States and require an accommodation in the recruiting process, you may contact our Human Resources Department at HR.Leave-Expert@thomsonreuters.com. Disability accommodations in the recruiting process may include things like a sign language interpreter, making interview rooms accessible, providing assistive technology, or other relevant accommodations. Please note this email is not intended for general recruitment questions and we will promptly respond to inquiries regarding accommodations. More information on requesting an accommodation here.   \n\nLearn more on how to protect yourself from fraudulent job postings here.   \n\nMore information about Thomson Reuters can be found on thomsonreuters.com",
+        "industry": "IT",
+        "jobBenefits": "Health Insurrance, Paid Holidays, Pension Plan",
+        "title": "Software Engineer",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/software-engineer-at-thomson-reuters-4424597883",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 36",
+          "ReactOS",
+          "Orchestration",
+          "Tea",
+          "OCaml",
+          "SCHEMA",
+          "Spring Framework",
+          "Liquibase",
+          "Typescript",
+          "Elasticsearch",
+          "JavaScript",
+          "Python",
+          "Sql",
+          "Java",
+          "Relational grammar",
+          "Iteration",
+          "Data management",
+          "Bedrock",
+          "Interpreter",
+          "AWS",
+          "Docker",
+          "Git",
+          "Github",
+          "Kubernetes",
+          "React.js",
+          "Software Engineering",
+          "Code review"
+        ],
+        "hiringOrganization": {
+          "identifier": "5fa8fe90ffc6802ef40b9b02",
+          "@type": "Organization",
+          "name": "Thomson Reuters",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQHtf0NHyUa92g/company-logo_200_200/company-logo_200_200/0/1719933220460/thomson_reuters_logo?e=2147483647&amp;v=beta&amp;t=qZwtla3V-aDhWoUTQTL7e8OAwNmcujw5m13vlRCdy7k",
+          "@context": "https://schema.org",
+          "url": "https://thomsonreuters.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "60d4b6dbb266f415974676a0",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "McLean",
+            "addressRegion": "VA",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 38.93759,
+          "name": "McLean, VA",
+          "@context": "https://schema.org",
+          "longitude": -77.18378
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 36
+        },
+        "applicantLocationRequirements": "Hybrid, Remote, EDT Timezone"
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -77.18378,
+        "lat": 38.93759
+      },
+      "title": "Software Engineer",
+      "skills": [
+        "monthsOfExperience: 36",
+        "ReactOS",
+        "Orchestration",
+        "Tea",
+        "OCaml",
+        "SCHEMA",
+        "Spring Framework",
+        "Liquibase",
+        "Typescript",
+        "Elasticsearch",
+        "JavaScript",
+        "Python",
+        "Sql",
+        "Java",
+        "Relational grammar",
+        "Iteration",
+        "Data management",
+        "Bedrock",
+        "Interpreter",
+        "AWS",
+        "Docker",
+        "Git",
+        "Github",
+        "Kubernetes",
+        "React.js",
+        "Software Engineering",
+        "Code review"
+      ],
+      "dateCreated": "2026-08-30T10:23:20.000Z",
+      "timezoneOffset": -4,
+      "countryCode": "us",
+      "company": "Thomson Reuters",
+      "state": "VA",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "Hybrid",
+        "Remote"
+      ],
+      "isRecruiter": false,
+      "dateExpired": "2026-11-02T20:25:57.000Z",
+      "hasSalary": false,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FlexTime",
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Engineer",
+      "dateActive": "2026-10-23T22:32:30.000Z",
+      "city": "Northbrook",
+      "timezone": "CDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "Trade",
+      "jsonLD": {
+        "identifier": "6a94275e5f9dd27371d7f6ee",
+        "image": "https://media.licdn.com/dms/image/v2/C560BAQGUXRBZdwV3WQ/company-logo_100_100/company-logo_100_100/0/1657035552986/crate__barrel_logo?e=2147483647&amp;v=beta&amp;t=F3tJezwPQ2fw2I5EhN2Yk05G6AKK_9O1cu56S7IlEiM",
+        "validThrough": "2026-10-23T22:32:30.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "@context": "https://schema.org",
+          "value": {
+            "minValue": "105000",
+            "@type": "QuantitativeValue",
+            "maxValue": "150000",
+            "@context": "https://schema.org",
+            "unitText": "YEAR"
+          }
+        },
+        "salaryCurrency": "USD",
+        "description": "As Senior Software Engineer, Content Lifecycle Operations, you will play a critical role in enabling the seamless flow of visual content---such as images, CGI, and 3D assets---across Crate and Barrel's content technology ecosystem, with a focus on Image Syndication \\& Content Platform Integration.Your primary responsibility will be to design and support scalable systems that syndicate digital assets from central platforms (like DAMs and PIMs) to third-party endpoints, ensuring delivery is automated, trackable, and metadata-rich. You'll collaborate with cross-functional partners in creative, marketing, merchandising, and technology to implement system integrations, manage API-driven workflows, and maintain data consistency across platforms like DAM, PIM, CMS, and external retail/media channels. This role is highly cross-functional, requiring strong technical knowledge, platform administration skills, and a sharp eye for operational efficiency.   \n\n* This position is fully remote\n* This role is an Individual Contributor  \n\n**A Day in the Life as a Senior Software Engineer, Content Lifecycle...**\n\n* Design and development of complex software solutions supporting content lifecycle operations, digital asset management, content syndication, and platform integrations, ensuring they meet functional and non-functional requirements\n* Actively participate in and champion Agile ceremonies, contributing to sprint planning, delivery, and continuous improvement\n* Collaborate closely with product managers, content teams, architects, and stakeholders to understand business needs, refine requirements, and deliver scalable technical solutions\n* Design, develop, and maintain APIs, microservices, and integration services connecting DAM, PIM, CMS, CDN, and third-party platforms\n* Take ownership of key technical components from design through deployment, support, and ongoing maintenance\n* Perform code reviews and promote engineering best practices, coding standards, and software quality\n* Troubleshoot and resolve complex issues across applications, integrations, and content delivery workflows\n* Monitor system performance using dashboards, logs, and analytics tools to ensure reliable and efficient content delivery\n* Contribute to architecture discussions and technical roadmaps, helping shape the future direction of content and integration platforms\n* Partner with internal teams and vendors to build scalable, reliable, and maintainable integration solutions\n* Support digital asset governance through metadata standards, taxonomy management, and content delivery best practices\n* Create and maintain technical documentation and contribute to knowledge sharing across the team\n* Drive continuous learning and contribute to improvements in CI/CD, automation, observability, and DevOps practices  \n\n**What You'll Bring To The Table...**\n\n* Strong expertise in software design, system integration, and architectural patterns\n* Deep understanding of Agile development methodologies and the software development lifecycle\n* Experience designing and developing APIs, microservices, and integration solutions\n* Working knowledge of digital asset management (DAM), product information management (PIM), content syndication, and content delivery platforms\n* Understanding of metadata management, taxonomy standards, and content governance practices\n* Excellent problem-solving, troubleshooting, analytical, and critical-thinking skills.\n* Strong communication, collaboration, and leadership skills, with the ability to work effectively across technical and business teams\n* Proven ability to mentor engineers and promote engineering best practices\n* Experience building scalable, high-performance, and reliable software solutions\n* Knowledge of software testing, automation, cloud platforms (AWS, Azure, GCP), microservices architecture, and DevOps practices\n* Familiarity with monitoring, logging, and analytics tools\n* Understanding of database design, performance optimization, and security best practices  \n\n**We'd Love to Hear From You If You Have...**\n\n* Bachelor's degree in Computer Science, Software Engineering, Information Systems, or a related field (or equivalent practical experience).\n* 5 years of professional software development experience with increasing technical responsibility\n* Proven experience designing and delivering complex software systems in an Agile environment\n* Experience leading technical initiatives and driving projects from design through production support\n* Strong proficiency in programming languages, frameworks, APIs, and integration technologies\n* Experience working with DAM, CDN, or similar content management and integration platforms\n* Experience in content operations, ecommerce, retail, or digital content ecosystems is a plus",
+        "industry": "Trade",
+        "title": "Senior Software Engineer, Content Lifecycle",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/senior-software-engineer-content-lifecycle-at-crate-barrel-4433524382",
+        "relevantOccupation": "Engineer",
+        "skills": [
+          "monthsOfExperience: 60",
+          "Coding",
+          "Hinge",
+          "Metadata",
+          "DevOps",
+          "CI / CD",
+          "Coding conventions",
+          "AWS",
+          "Software Engineering"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "60c8768262c66f643e393125",
+          "@type": "Organization",
+          "name": "Crate &amp; Barrel",
+          "logo": "https://media.licdn.com/dms/image/v2/C560BAQGUXRBZdwV3WQ/company-logo_200_200/company-logo_200_200/0/1657035552986/crate__barrel_logo?e=2147483647&amp;v=beta&amp;t=0mKu9UMBzcjNv7pEQd3zw03D1S2ujjMLOlkbe_goxEw",
+          "alternateName": "Crate & Barrel",
+          "@context": "https://schema.org",
+          "url": "https://crateandbarrel.com"
+        },
+        "responsibilities": "Engineering and Information Technology",
+        "jobLocation": {
+          "identifier": "9138510baf0945eeed501244",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Northbrook",
+            "addressRegion": "IL",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 42.130978,
+          "name": "Northbrook, IL",
+          "@context": "https://schema.org",
+          "longitude": -87.83156
+        },
+        "employmentUnit": "IT",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 60
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Northbrook, Illinois, United States"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -87.83156,
+        "lat": 42.130978
+      },
+      "title": "Senior Software Engineer, Content Lifecycle",
+      "skills": [
+        "monthsOfExperience: 60",
+        "Coding",
+        "Hinge",
+        "Metadata",
+        "DevOps",
+        "CI / CD",
+        "Coding conventions",
+        "AWS",
+        "Software Engineering"
+      ],
+      "dateCreated": "2026-08-30T12:42:11.000Z",
+      "timezoneOffset": -5,
+      "countryCode": "us",
+      "company": "Crate & Barrel",
+      "state": "IL",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "IT",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": false,
+      "dateExpired": "2026-10-23T22:32:30.000Z",
+      "minSalary": 105000,
+      "hasSalary": true,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FullTime"
+      ],
+      "isDirect": false
+    },
+    {
+      "occupation": "Front End Programmer",
+      "dateActive": "2026-09-29T11:14:48.000Z",
+      "city": "Greater Chicago",
+      "timezone": "CDT",
+      "contractType": [
+        "N/A"
+      ],
+      "language": "en",
+      "industry": "Engineering",
+      "jsonLD": {
+        "identifier": "6a94364b548fdf65c1f74372",
+        "image": "https://media.licdn.com/dms/image/v2/D4E0BAQGaKQznziWRhw/company-logo_100_100/B4EZ_VmTnDJsAQ-/0/1785995016873/hiredddd_logo?e=2147483647&amp;v=beta&amp;t=vcI7wsOYe8GxS1A8XypEdSv062gWJk6J4nO6K7wJUbA",
+        "validThrough": "2026-09-29T11:14:48.000Z",
+        "employmentType": "FullTime",
+        "@type": "JobPosting",
+        "salaryCurrency": "USD",
+        "description": "* **Role:** Frontend Engineer\n* **Location:** Remote\n* **Employment Type:** Full-time\n\n**Compensation:** Competitive salary commensurate with experience, qualifications, and location. **Indicative range:** $95,000 -- $160,000 (USD equivalent), plus benefits.\n\n**Role Overview**\n\nWe are hiring a Frontend Engineer to build accessible, performant, and beautiful interfaces. The role partners with design and product to translate ideas into shipped UI --- the surface customers actually touch.\n\n**Key Responsibilities**\n\n- Build user interfaces in React, Vue, or similar modern framework\n\n- Translate design specs into pixel-accurate, accessible, performant code\n\n- Maintain and evolve the design system and shared component library\n\n- Optimise frontend performance, including bundle size and Core Web Vitals\n\n- Conduct code reviews and contribute to engineering practices\n\n- Partner closely with designers and product managers throughout the build cycle\n\n**Required Skills and Qualifications**\n\n- 3 years building production frontend applications\n\n- Strong proficiency in JavaScript/TypeScript, React or Vue, and modern CSS\n\n- Experience with state management (Redux, Zustand, Pinia, or similar)\n\n- Familiarity with accessibility standards (WCAG) and testing tools\n\n- Understanding of web performance optimisation\n\n- Strong design sensibility and care for craft\n\n**What You'll Bring**\n\n- Curiosity to dig into systems and turn findings into shipped improvements\n\n- Strong written communication and ability to explain technical decisions\n\n- A test-and-learn mindset; you ship fast, measure, and iterate\n\n- Comfort working asynchronously across time zones\n\n**What We Offer**\n\n- Fully remote, flexible work hours\n\n- Performance-based bonus structure\n\n- Annual learning \\& development stipend\n\n- Health and wellness benefits (varies by location)\n\n- Opportunity to work on high-scale, real-world impact projects\n\n**Equal Opportunity Statement**\n\nThis is an equal opportunity role. Applications are welcomed from all qualified individuals regardless of race, color, ethnicity, nationality, gender, gender identity or expression, sexual orientation, age, religion, disability, marital status, or any other characteristic protected by applicable law. All hiring decisions are based solely on qualifications, skills, and demonstrated ability.",
+        "industry": "Engineering",
+        "jobBenefits": "Wellness Program",
+        "title": "Frontend Engineer",
+        "@context": "https://schema.org",
+        "url": "https://www.linkedin.com/jobs/view/frontend-engineer-at-hired-4460893236",
+        "relevantOccupation": "Front End Programmer",
+        "skills": [
+          "monthsOfExperience: 36",
+          "ReactOS",
+          "Redux",
+          "Vue.js",
+          "Google Pixel",
+          "Typescript",
+          "JavaScript",
+          "Iteration",
+          "React.js"
+        ],
+        "jobLocationType": "TELECOMMUTE",
+        "hiringOrganization": {
+          "identifier": "613bb2fac71952508790714d",
+          "@type": "Organization",
+          "name": "Hired",
+          "logo": "https://media.licdn.com/dms/image/v2/D4E0BAQGaKQznziWRhw/company-logo_200_200/B4EZ_VmTnDJsAM-/0/1785995016873/hiredddd_logo?e=2147483647&amp;v=beta&amp;t=XkCG3pb4l-hKiClHYRusxgJOkE90s3UR8UIjAW40pkc",
+          "@context": "https://schema.org",
+          "url": "https://hired.org"
+        },
+        "responsibilities": "Engineering, Administrative, and Sales",
+        "jobLocation": {
+          "identifier": "04ef5c892af2617486a16d67",
+          "address": {
+            "addressCountry": "United States",
+            "@type": "PostalAddress",
+            "addressLocality": "Greater Chicago",
+            "@context": "https://schema.org"
+          },
+          "@type": "Place",
+          "latitude": 41.948055,
+          "name": "Greater Chicago Area",
+          "@context": "https://schema.org",
+          "longitude": -87.655754
+        },
+        "employmentUnit": "HR",
+        "educationRequirements": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "bachelor degree"
+        },
+        "datePosted": "2026-08-30",
+        "experienceRequirements": {
+          "@type": "OccupationalExperienceRequirements",
+          "monthsOfExperience": 36
+        },
+        "applicantLocationRequirements": {
+          "@type": "Country",
+          "name": "Greater Chicago Area"
+        }
+      },
+      "source": "linkedin_us",
+      "locale": "en_US",
+      "geoPoint": {
+        "lon": -87.655754,
+        "lat": 41.948055
+      },
+      "title": "Frontend Engineer",
+      "skills": [
+        "monthsOfExperience: 36",
+        "ReactOS",
+        "Redux",
+        "Vue.js",
+        "Google Pixel",
+        "Typescript",
+        "JavaScript",
+        "Iteration",
+        "React.js"
+      ],
+      "dateCreated": "2026-08-30T11:14:49.000Z",
+      "timezoneOffset": -5,
+      "countryCode": "us",
+      "company": "Hired",
+      "isDuplicate": false,
+      "portal": "linkedin",
+      "department": "HR",
+      "workPlace": [
+        "Remote"
+      ],
+      "isRecruiter": false,
+      "dateExpired": "2026-09-29T11:14:48.000Z",
+      "hasSalary": false,
+      "careerLevel": [
+        "Senior"
+      ],
+      "workType": [
+        "FlexTime",
+        "FullTime"
+      ],
+      "isDirect": false
+    }
+  ],
+  "resultSizeInBytes": 82720
+}
