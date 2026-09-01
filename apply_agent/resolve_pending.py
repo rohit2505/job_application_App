@@ -107,6 +107,21 @@ def save_json(path, data):
         json.dump(data, f, indent=2)
 
 
+# Telegram messages that should kick off a full job_search.py -> ... ->
+# auto_apply.py pipeline run (job-pipeline.yml), independent of any pending
+# Adzuna resolution. Match is case-insensitive and ignores surrounding
+# whitespace; a leading "/" is optional (Telegram bot commands usually have
+# one, but plain text works too).
+TRIGGER_PHRASES = {"run", "run search", "run job search", "run jobs", "runjobs"}
+
+
+def is_trigger_message(text):
+    t = (text or "").strip().lower()
+    if t.startswith("/"):
+        t = t[1:]
+    return t in TRIGGER_PHRASES
+
+
 def telegram_get_updates(offset):
     token = cfg("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -144,6 +159,25 @@ def main():
     ap.add_argument("--headless", action="store_true", default=False)
     args = ap.parse_args()
 
+    # Poll Telegram FIRST, unconditionally — a "run" trigger message has to
+    # be caught even when there's nothing pending, and the offset has to
+    # advance either way or we'd reprocess the same messages forever.
+    offset_state = load_json(args.offset_file, {})
+    offset = offset_state.get("offset")
+    updates, new_offset = telegram_get_updates(offset)
+
+    trigger_hit = any(is_trigger_message(u.get("message", {}).get("text", "")) for u in updates)
+    if trigger_hit:
+        print("  [trigger] got a 'run' message on Telegram — signaling job-pipeline.yml to start")
+        gh_out = os.environ.get("GITHUB_OUTPUT")
+        if gh_out:
+            with open(gh_out, "a", encoding="utf-8") as f:
+                f.write("trigger_pipeline=true\n")
+        try:
+            aa.send_whatsapp("👍 Got it — starting a job search run now.")
+        except Exception:
+            pass
+
     pending = load_json(args.pending_file, {})
     if not pending:
         # Nothing outstanding — this is exactly when a queued Adzuna job (if
@@ -154,13 +188,12 @@ def main():
         print(f"  [adzuna queue] {q_status}")
         pending = load_json(args.pending_file, {})
         if not pending:
+            save_json(args.offset_file, {"offset": new_offset})
             print("  Nothing pending — no Adzuna jobs waiting on a resolved URL.")
             return
 
-    offset_state = load_json(args.offset_file, {})
-    offset = offset_state.get("offset")
-    updates, new_offset = telegram_get_updates(offset)
     if not updates:
+        save_json(args.offset_file, {"offset": new_offset})
         print("  No new Telegram messages.")
         return
 

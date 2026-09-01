@@ -18,15 +18,15 @@ name: Job Search Pipeline
 #   3. (Optional) adjust the cron schedule below and JOB_QUERY/JOB_LOCATION.
 
 on:
-  # Weekly, not daily: the sole source now is Active Jobs DB, whose RapidAPI
-  # free tier is a hard 250 jobs/month + 25 requests/month. One query * one
-  # request/run * weekly = ~4 requests + ~200 jobs/month, safely under both
-  # caps. time_frame is 7d in job_search.py so there's no gap between runs.
-  # Don't switch this back to daily (or add more JOB_QUERY entries) without
-  # re-budgeting the quota first.
-  schedule:
-    - cron: "0 13 * * 1"   # 13:00 UTC every Monday — adjust to your timezone
-  workflow_dispatch: {}     # lets you click "Run workflow" manually in the GitHub UI
+  # No cron for now (2026-09, Rohit's request) — auto-apply is still being
+  # validated (Greenhouse blank-form fix, Apify source switch), so runs are
+  # manual only: click "Run workflow" in the GitHub UI, or send "run" to the
+  # Telegram bot (resolve-pending.yml polls for that and dispatches this
+  # workflow — see its own comments). Re-add a schedule once auto-apply is
+  # trusted; the old RapidAPI-quota-driven weekly cadence no longer applies
+  # now that the sole source is Apify (pay-per-result, no monthly cap).
+  workflow_dispatch: {}     # lets you click "Run workflow" manually in the GitHub UI,
+                             # or via resolve-pending.yml's API call on a Telegram "run" message
 
 permissions:
   contents: write   # needed to commit state/output back so re-runs don't duplicate
