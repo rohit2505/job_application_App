@@ -1,0 +1,27 @@
+{
+  "92": {
+    "job": {
+      "source": "adzuna",
+      "title": "Senior Data Engineer(Only Indepedent candidates and Inperson Interview is Mandate)",
+      "company": "Sidzen LLC",
+      "location": "Grand Central, Manhattan",
+      "salary": "169,893\u2013169,893",
+      "url": "https://www.adzuna.com/land/ad/5865183119?se=Tp26BkGm8RGs-Y02KTQxmA&utm_medium=api&utm_source=ad8b68c8&v=1283D776DF88090729189AFEBA3511FE88B26410",
+      "tags": [],
+      "remote": false,
+      "posted": "2026-09-01T14:23:53+00:00",
+      "no_sponsor": false,
+      "us_guaranteed": true,
+      "salary_min": 169893.3,
+      "salary_max": 169893.3,
+      "description": "Core Competencies: Advanced proficiency in Python, SQL Server, Snowflake, Azure Databricks, and PySpark. Strong understanding of relational databases, ETL processes, and data modeling. Expertise in system design, architecture, and implementing robust data pipelines. Hands-on experience with data validation, quality checks, and automation tools (Autosys, Control-M). Effective communicator with the ability to collaborate with business analysts, users, and global teams. Key Responsibilities: Colla\u2026",
+      "score": 88,
+      "reason": "Modern stack match (Python, PySpark, Snowflake, Azure Databricks). Senior level, strong SQL foundation. Advanced role accelerates transition.",
+      "employer_type": "direct",
+      "remote_signal": "unclear"
+    },
+    "resume": "../resume_creation_agent/output/sidzen-llc__senior-data-engineer-only-indepedent-can/resume.docx",
+    "cover": "../resume_creation_agent/output/sidzen-llc__senior-data-engineer-only-indepedent-can/cover_letter.docx",
+    "notified_at": 1788294142.6888912
+  }
+}

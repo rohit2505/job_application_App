@@ -1,4 +1,12 @@
 {
+"https://himalayas.app/companies/interwell-health/jobs/staff-data-engineer-706433227": {
+"employer_type": "direct",
+"score": 88
+},
+"https://himalayas.app/companies/metova/jobs/senior-data-engineer": {
+"drop": "employer_type:consulting",
+"score": 62
+},
 "https://jobicy.com/jobs/152257-director-specialist-sales-engineering-data-security": {
 "employer_type": "direct",
 "score": 28
@@ -14,6 +22,22 @@
 "https://jobicy.com/jobs/152296-database-migration-engineer": {
 "drop": "employer_type:consulting",
 "score": 72
+},
+"https://jobicy.com/jobs/152318-senior-data-engineer-3": {
+"employer_type": "direct",
+"score": 92
+},
+"https://jobicy.com/jobs/152320-principal-analytics-engineer": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobicy.com/jobs/152321-staff-analytics-engineer-gtm-data-science-analytics": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobicy.com/jobs/152323-staff-data-engineer": {
+"employer_type": "direct",
+"score": 88
 },
 "https://www.adzuna.com/details/5862761720?utm_medium=api&utm_source=ad8b68c8": {
 "employer_type": "direct",
@@ -97,15 +121,27 @@
 "drop": "employer_type:consulting",
 "score": 62
 },
+"https://www.adzuna.com/land/ad/5863519470?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=4427B4B224CCD1E668A877408727A6B2FB658DBC": {
+"drop": "employer_type:consulting",
+"score": 58
+},
 "https://www.adzuna.com/land/ad/5863796056?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=28CF1DEC9B61CB36CC7AA1DF33ACE059D530DA5E": {
 "drop": "employer_type:consulting",
 "score": 78
+},
+"https://www.adzuna.com/land/ad/5863796056?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=28CF1DEC9B61CB36CC7AA1DF33ACE059D530DA5E": {
+"drop": "employer_type:staffing",
+"score": 48
 },
 "https://www.adzuna.com/land/ad/5863984341?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=B390F2560F118388998BD5DD1CA8CE978D1FDAC2": {
 "employer_type": "direct",
 "score": 72
 },
 "https://www.adzuna.com/land/ad/5863984945?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=4E7E62E0F03B46F1DF6322E559C112BDF2B3DC82": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5863984945?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=4E7E62E0F03B46F1DF6322E559C112BDF2B3DC82": {
 "drop": "employer_type:consulting",
 "score": 72
 },
@@ -117,7 +153,15 @@
 "drop": "employer_type:consulting",
 "score": 42
 },
+"https://www.adzuna.com/land/ad/5864091452?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=1112D85ED0405E627CDAE360E242032E8081B0EC": {
+"drop": "employer_type:consulting",
+"score": 72
+},
 "https://www.adzuna.com/land/ad/5864097670?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=0EB31D74F3ED11F8E288D603FF559C6D7E756320": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5864097670?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=0EB31D74F3ED11F8E288D603FF559C6D7E756320": {
 "drop": "employer_type:consulting",
 "score": 72
 },
@@ -129,14 +173,33 @@
 "employer_type": "direct",
 "score": 82
 },
+"https://www.adzuna.com/land/ad/5864294279?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=D5E5BB85C42AE5EB1E1AA91F1EF8B619ED20017B": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5864668503?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=1247581B9B2C46CD95ECB38D997B78EE34FF74F1": {
+"drop": "no_sponsor"
+},
 "https://www.adzuna.com/land/ad/5864668503?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=1247581B9B2C46CD95ECB38D997B78EE34FF74F1": {
 "drop": "no_sponsor"
+},
+"https://www.adzuna.com/land/ad/5864789871?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=3D226CE1B8E13C9ED46BAA3D8FFFD8C321DE7640": {
+"employer_type": "direct",
+"score": 72
 },
 "https://www.adzuna.com/land/ad/5864789871?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=3D226CE1B8E13C9ED46BAA3D8FFFD8C321DE7640": {
 "employer_type": "direct",
 "score": 72
 },
+"https://www.adzuna.com/land/ad/5864812009?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=4F64A9D10B046FBED902731256832B04ED6299A1": {
+"employer_type": "direct",
+"score": 78
+},
 "https://www.adzuna.com/land/ad/5864812009?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=4F64A9D10B046FBED902731256832B04ED6299A1": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5864816976?se=EB2FCUGm8RGQ7M7zg-g2dQ&utm_medium=api&utm_source=ad8b68c8&v=2D9AF3E8D6C3F2C557B3515EB3599C3549D3B54E": {
 "employer_type": "direct",
 "score": 78
 },
@@ -144,9 +207,17 @@
 "employer_type": "direct",
 "score": 78
 },
+"https://www.adzuna.com/land/ad/5864826117?se=6usXD0Gm8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=D1252E4FB73E5C4F53B453FE5D8B86F906B8A122": {
+"employer_type": "direct",
+"score": 88
+},
 "https://www.adzuna.com/land/ad/5864826117?se=Bjd3NCim8RGUNa3mkcr13g&utm_medium=api&utm_source=ad8b68c8&v=D1252E4FB73E5C4F53B453FE5D8B86F906B8A122": {
 "employer_type": "direct",
 "score": 88
+},
+"https://www.adzuna.com/land/ad/5864950011?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=E3807C85554A475900F62B0AA3D72B321A794103": {
+"employer_type": "direct",
+"score": 62
 },
 "https://www.adzuna.com/land/ad/5864950011?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=E3807C85554A475900F62B0AA3D72B321A794103": {
 "employer_type": "direct",
@@ -156,9 +227,17 @@
 "drop": "employer_type:consulting",
 "score": 62
 },
+"https://www.adzuna.com/land/ad/5865028661?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=22C182A0E441DA7F7C7C056CA1198B16259A887C": {
+"employer_type": "direct",
+"score": 72
+},
 "https://www.adzuna.com/land/ad/5865048906?se=hGKrLiim8RGUNa3mkcr13g&utm_medium=api&utm_source=ad8b68c8&v=51145B4C8A5B367EF801D95235301BDCC738D977": {
 "drop": "employer_type:consulting",
 "score": 72
+},
+"https://www.adzuna.com/land/ad/5865049724?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=0D41DC3DEE867831626D3D8A300D2E1D705698A1": {
+"employer_type": "unknown",
+"score": 78
 },
 "https://www.adzuna.com/land/ad/5865049724?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=0D41DC3DEE867831626D3D8A300D2E1D705698A1": {
 "drop": "employer_type:consulting",
@@ -168,8 +247,39 @@
 "employer_type": "unknown",
 "score": 88
 },
+"https://www.adzuna.com/land/ad/5865051118?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=EF487C3D2558A0D18F488DF49366F6AC7B10031C": {
+"drop": "employer_type:staffing",
+"score": 78
+},
 "https://www.adzuna.com/land/ad/5865051118?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=EF487C3D2558A0D18F488DF49366F6AC7B10031C": {
 "drop": "employer_type:staffing",
 "score": 78
+},
+"https://www.adzuna.com/land/ad/5865083385?se=6usXD0Gm8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=C2D332992E55F4A57B3093514EFE72D81BE042C1": {
+"employer_type": "direct",
+"score": 32
+},
+"https://www.adzuna.com/land/ad/5865131583?se=Ztq8E0Gm8RGW-Lh3sa6_5w&utm_medium=api&utm_source=ad8b68c8&v=51AC4B2577E5CFAA813C488E0D504174C2A6D4B4": {
+"employer_type": "direct",
+"score": 42
+},
+"https://www.adzuna.com/land/ad/5865154715?se=6usXD0Gm8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=284D61824C027A8F1A1063FFA4B6DCD6C63CB12A": {
+"employer_type": "direct",
+"score": 22
+},
+"https://www.adzuna.com/land/ad/5865183118?se=Tp26BkGm8RGs-Y02KTQxmA&utm_medium=api&utm_source=ad8b68c8&v=09BBEC22E98FBF7E931AAB5D112097439D6FCDE2": {
+"drop": "staffing_blocklist"
+},
+"https://www.adzuna.com/land/ad/5865183119?se=EP-VFkGm8RG0L_SoL9ExbQ&utm_medium=api&utm_source=ad8b68c8&v=1283D776DF88090729189AFEBA3511FE88B26410": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5865183119?se=Tp26BkGm8RGs-Y02KTQxmA&utm_medium=api&utm_source=ad8b68c8&v=1283D776DF88090729189AFEBA3511FE88B26410": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5865183219?se=Tp26BkGm8RGs-Y02KTQxmA&utm_medium=api&utm_source=ad8b68c8&v=4209177E0819F04EEF2E1A4C9FB0B703F391BA0E": {
+"drop": "employer_type:consulting",
+"score": 72
 }
 }
