@@ -102,19 +102,22 @@ def slug(s, n=40):
 # limits, no 24h window to keep alive) ----
 def send_whatsapp(body):
     """Name kept for call-site compatibility; sends via Telegram now.
-    Returns (ok, detail)."""
+    Returns (ok, detail, message_id_or_None) — message_id lets a caller
+    later match a reply (Telegram's reply_to_message.message_id) back to
+    the specific job this message was about."""
     token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
     if not (token and chat_id):
-        return False, "telegram creds not set"
+        return False, "telegram creds not set", None
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": body}).encode()
     req = urllib.request.Request(url, data=data)
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
-            json.loads(r.read().decode())
-        return True, "sent"
+            resp = json.loads(r.read().decode())
+        message_id = (resp.get("result") or {}).get("message_id")
+        return True, "sent", message_id
     except Exception as e:
-        return False, f"send error: {e}"
+        return False, f"send error: {e}", None
 
 
 def _multipart_encode(fields, files):
@@ -214,6 +217,37 @@ def save_seen(p, s):
     json.dump(sorted(s), open(p, "w", encoding="utf-8"), indent=0)
 
 
+ADZUNA_HOST_SUFFIX = "adzuna.com"
+
+
+def _is_adzuna_url(url):
+    try:
+        host = (urllib.parse.urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    return host == ADZUNA_HOST_SUFFIX or host.endswith("." + ADZUNA_HOST_SUFFIX)
+
+
+PENDING_RESOLUTION_FILE_DEFAULT = "state/pending_resolution.json"
+
+
+def load_pending(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_pending(path, data):
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
 def _folder_for(job, out_root):
     return os.path.join(out_root, f"{slug(job.get('company'))}__{slug(job.get('title'))}")
 
@@ -240,6 +274,10 @@ def main():
     ap.add_argument("--success-file", default=os.environ.get("APPLIED_SUCCESS_FILE",
                     "state/auto_applied_success.json"),
                     help="jobs auto_apply.py already submitted — skip these, no double-notify")
+    ap.add_argument("--pending-file", default=os.environ.get("PENDING_RESOLUTION_FILE",
+                    PENDING_RESOLUTION_FILE_DEFAULT),
+                    help="tracks Telegram message_id -> Adzuna job, so a reply with the "
+                         "resolved employer URL can be picked up by resolve_pending.py")
     ap.add_argument("--keepalive", action="store_true",
                     help="(legacy no-op) Telegram has no expiring session, unlike the old "
                          "Twilio WhatsApp sandbox, so there's nothing to keep alive")
@@ -258,6 +296,7 @@ def main():
 
     seen = load_seen(args.seen_file)
     already_applied = load_seen(args.success_file)
+    pending = load_pending(args.pending_file)
     sent = 0
     for j in jobs:
         jid = (j.get("url") or f"{j.get('company')}:{j.get('title')}").strip()
@@ -284,12 +323,32 @@ def main():
         # Telegram documents, so applying is possible entirely from a phone:
         # tap the link, and when the job site asks for a resume upload, the
         # file is already sitting in this chat's cache, no Gmail round trip.
-        tg_ok, detail = send_whatsapp(f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
-                                      f"Apply: {link}\n"
-                                      + ("(resume + cover letter below)" if attachments
-                                         else "(resume in your email)"))
+        is_adzuna = _is_adzuna_url(link)
+        if is_adzuna:
+            # Adzuna's redirect can't always be resolved automatically (see
+            # auto_apply.py) — but a real, non-automated click from your own
+            # phone/browser always gets past it. Ask for that one click back,
+            # via Telegram's native "reply" so we know exactly which job it's
+            # for, and hand the resulting real URL straight to auto-apply.
+            tg_text = (f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
+                       f"Open: {link}\n\n"
+                       "This one needs a real click to get past Adzuna's redirect — "
+                       "open it, let it land on the real company/ATS page, then "
+                       "REPLY to THIS message with that final URL and I'll take it "
+                       "from there (fill + submit automatically where supported).\n"
+                       + ("(resume + cover letter below)" if attachments else "(resume in your email)"))
+        else:
+            tg_text = (f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
+                       f"Apply: {link}\n"
+                       + ("(resume + cover letter below)" if attachments else "(resume in your email)"))
+        tg_ok, detail, tg_message_id = send_whatsapp(tg_text)
         if not tg_ok and emailed:
             print(f"  [telegram] not delivered ({detail}) — job is in your email.", file=sys.stderr)
+        if tg_ok and is_adzuna and tg_message_id:
+            pending[str(tg_message_id)] = {
+                "job": j, "resume": resume, "cover": cover,
+                "notified_at": time.time(),
+            }
         if tg_ok:
             for path, label in ((resume, "Resume"), (cover, "Cover letter")):
                 if not path:
@@ -306,6 +365,7 @@ def main():
                   f"(email={'y' if emailed else 'n'}, telegram={'y' if tg_ok else 'n'})")
 
     save_seen(args.seen_file, seen)
+    save_pending(args.pending_file, pending)
     print(f"\nNotified {sent} new job(s).")
 
 
