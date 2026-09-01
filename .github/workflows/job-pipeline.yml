@@ -41,6 +41,8 @@ env:
   MIN_SALARY: "160000"
   MIN_SCORE: "70"
   TOP: "10"
+  REMOTE_ONLY: "true"         # drop anything not tagged remote (Active Jobs DB's
+                               # ai_work_arrangement=Remote OK/Remote Solely)
 
 jobs:
   run-pipeline:
@@ -84,6 +86,9 @@ jobs:
       - name: Stage 1 — fetch jobs
         working-directory: job_Search
         run: |
+          # REMOTE_ONLY / JOB_QUERY / JOB_LOCATION are picked up straight from
+          # the environment (env_flag()/cfg() in job_search.py) -- no matching
+          # CLI flag needed here.
           python3 job_search.py \
             --window-min "$WINDOW_MIN" \
             --min-salary "$MIN_SALARY" \
