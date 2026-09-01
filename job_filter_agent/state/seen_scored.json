@@ -1,4 +1,7 @@
 {
+"https://boards.greenhouse.io/accenturefederalservices/jobs/4609467006?gh_jid=4609467006": {
+"drop": "no_sponsor"
+},
 "https://himalayas.app/companies/interwell-health/jobs/staff-data-engineer-706433227": {
 "employer_type": "direct",
 "score": 88
@@ -6,6 +9,18 @@
 "https://himalayas.app/companies/metova/jobs/senior-data-engineer": {
 "drop": "employer_type:consulting",
 "score": 62
+},
+"https://job-boards.eu.greenhouse.io/valtech/jobs/4964189101": {
+"drop": "employer_type:consulting",
+"score": 52
+},
+"https://job-boards.greenhouse.io/doordashusa/jobs/8168866": {
+"employer_type": "direct",
+"score": 88
+},
+"https://job-boards.greenhouse.io/incidentiq/jobs/7741633003": {
+"employer_type": "direct",
+"score": 88
 },
 "https://jobicy.com/jobs/152257-director-specialist-sales-engineering-data-security": {
 "employer_type": "direct",
@@ -36,6 +51,14 @@
 "score": 88
 },
 "https://jobicy.com/jobs/152323-staff-data-engineer": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobs.lever.co/jobgether/ab8867bb-5281-42da-bb9d-c1b3ed95f1aa": {
+"drop": "employer_type:staffing",
+"score": 78
+},
+"https://jobs.lever.co/thinkahead/a9d8745f-8ba6-4a98-9d90-b7ed3466e032": {
 "employer_type": "direct",
 "score": 88
 },
