@@ -87,28 +87,29 @@ def main():
 
     ap = argparse.ArgumentParser()
     ap.add_argument("title")
-    ap.add_argument("--location", default="United States")
-    ap.add_argument("--remote", action="store_true")
+    ap.add_argument("--location", default='"United States"')
+    ap.add_argument("--time-frame", default="24h", choices=["24h", "72h", "7d"])
     ap.add_argument("--limit", type=int, default=50)
     ap.add_argument("--out", default="activejobsdb_sample.json")
     ap.add_argument("--domains", action="store_true",
                      help="print a tally of apply-URL hostnames across the pulled results")
     args = ap.parse_args()
 
+    title_q = args.title if args.title.startswith('"') else f'"{args.title}"'
     params = {
-        "title_filter": args.title,
-        "location_filter": args.location,
+        "time_frame": args.time_frame,
         "limit": args.limit,
         "offset": 0,
-        "description_type": "text",
+        "description_format": "text",
+        "title": title_q,
+        "location": args.location,
     }
-    if args.remote:
-        params["ai_work_arrangement_filter"] = "remote"
 
     host = "active-jobs-db.p.rapidapi.com"
-    endpoint = "/active-ats-7d"  # last-7-days feed of active ATS postings
+    endpoint = "/active-ats"
     url = f"https://{host}{endpoint}?" + urllib.parse.urlencode(params)
-    headers = {"X-RapidAPI-Key": key, "X-RapidAPI-Host": host}
+    headers = {"Content-Type": "application/json",
+               "x-rapidapi-key": key, "x-rapidapi-host": host}
     req = urllib.request.Request(url, headers=headers)
 
     print(f"GET {url}")

@@ -53,12 +53,12 @@ DEFAULT_SEEN_FILE = "state/seen.json"
 COMPANIES_FILE = "companies.json"
 
 ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
-               "jsearch", "himalayas", "greenhouse", "lever", "ashby"]
+               "jsearch", "himalayas", "activejobsdb", "greenhouse", "lever", "ashby"]
 
 # What runs by default: the aggregators + JSearch. The company ATS boards
 # (greenhouse/lever/ashby) are OFF by default — enable with --sources if wanted.
 DEFAULT_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse",
-                   "remoteok", "jsearch", "himalayas"]
+                   "remoteok", "jsearch", "himalayas", "activejobsdb"]
 
 # ==========================================================================  #
 #  LOCAL TESTING KEYS  —  paste your keys here to run on your own machine.
@@ -699,6 +699,78 @@ def fetch_jsearch(query, now, window_min, country="us", location=None, remote_on
     return out
 
 
+def fetch_active_jobs_db(query, now, window_min, location=None):
+    # Active Jobs DB (fantastic.jobs, via RapidAPI) — sources directly from
+    # 200k+ employer ATS platforms (Greenhouse, Lever, Workday, Oracle Cloud
+    # HCM, Ashby, iCIMS, BambooHR, Comeet, Dayforce, Rippling, ApplyToJob,
+    # etc.), NOT aggregated from LinkedIn like most "job board" APIs — a real
+    # domain-breakdown test (2026-09) showed 0 LinkedIn links across 100
+    # results, vs. 90% LinkedIn for a comparable Techmap.io pull. Free tier
+    # is only 250 jobs/month total though, so keep each pull small.
+    key = cfg("RAPIDAPI_KEY")
+    if not key:
+        print("  [activejobsdb] skipped — set RAPIDAPI_KEY (same key as jsearch)")
+        return []
+    if quota_exhausted("activejobsdb"):
+        print("  [activejobsdb] skipped — quota was exhausted as of the last call; "
+              "not retrying until it's likely reset (see state/rapidapi_quota.json)")
+        return []
+    time_frame = "24h" if window_min <= 1440 else ("72h" if window_min <= 4320 else "7d")
+    loc_q = f'"{location}"' if location else '"United States"'
+    params = {
+        "time_frame": time_frame,
+        "limit": 50,        # free tier is only 250 jobs/month total — stay modest
+        "offset": 0,
+        "description_format": "text",
+        "title": f'"{query}"',
+        "location": loc_q,
+    }
+    host = "active-jobs-db.p.rapidapi.com"
+    url = f"https://{host}/active-ats?" + urllib.parse.urlencode(params)
+    headers = {"Content-Type": "application/json",
+               "x-rapidapi-key": key, "x-rapidapi-host": host}
+    try:
+        resp, resp_headers = get_json_with_headers(url, headers=headers)
+    except RuntimeError as e:
+        record_quota_from_error("activejobsdb", e)
+        raise
+    record_quota_from_success("activejobsdb", resp_headers)
+    rows = resp if isinstance(resp, list) else []
+    out = []
+    for j in rows:
+        if not isinstance(j, dict):
+            continue
+        posted = parse_iso(j.get("date_posted"))
+        if not in_window(posted, now, window_min):
+            continue
+        title = j.get("title", "")
+        desc = j.get("description_text", "")
+        loc_str = ", ".join(j.get("locations_derived") or []) or "—"
+        # ai_salary_min/max_value come in whatever unit ai_salary_unit_text
+        # says (YEAR/MONTH/WEEK/DAY/HOUR) — normalize to annual, or a $24/hr
+        # intern rate reads as a $24/year salary and either gets wrongly
+        # excluded by --min-salary or (worse, for a high hourly contract
+        # rate) wrongly excluded from being flagged as well-paid.
+        _UNIT_TO_ANNUAL = {"YEAR": 1, "MONTH": 12, "WEEK": 52, "DAY": 260, "HOUR": 2080}
+        unit_mult = _UNIT_TO_ANNUAL.get(str(j.get("ai_salary_unit_text") or "YEAR").upper(), 1)
+        smin_raw, smax_raw = j.get("ai_salary_min_value"), j.get("ai_salary_max_value")
+        smin = smin_raw * unit_mult if smin_raw else None
+        smax = smax_raw * unit_mult if smax_raw else None
+        salary = format_salary_range(smin, smax)
+        arrangement = (j.get("ai_work_arrangement") or "").lower()
+        is_remote = "remote" in arrangement
+        visa = str(j.get("ai_visa_sponsorship") or "").strip().lower()
+        no_sponsor = visa in ("no", "false", "not offered", "none", "not available")
+        out.append(job("activejobsdb", title, j.get("organization"), loc_str,
+                       j.get("url"), salary=salary,
+                       tags=[j.get("source")] if j.get("source") else [],
+                       remote=is_remote, posted=posted,
+                       no_sponsor=no_sponsor or rejects_sponsorship(title, desc),
+                       us_guaranteed=("United States" in (j.get("countries_derived") or [])),
+                       salary_min=smin, salary_max=smax, description=desc))
+    return out
+
+
 def fetch_jobicy(query, now, window_min):
     # Remote-only board with a geo=usa filter — ideal for US-remote roles.
     url = "https://jobicy.com/api/v2/remote-jobs?" + urllib.parse.urlencode(
@@ -1197,6 +1269,7 @@ def main():
             "muse": lambda: fetch_muse(q, now, w, location=args.location),
             "remoteok": lambda: fetch_remoteok(q, now, w),
             "himalayas": lambda: fetch_himalayas(q, now, w),
+            "activejobsdb": lambda: fetch_active_jobs_db(q, now, w, location=args.location),
             "greenhouse": lambda: fetch_greenhouse(q, now, w, companies["greenhouse"]),
             "lever": lambda: fetch_lever(q, now, w, companies["lever"]),
             "ashby": lambda: fetch_ashby(q, now, w, companies["ashby"]),
