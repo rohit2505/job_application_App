@@ -1,0 +1,62 @@
+name: Telegram Trigger
+
+# Polls Telegram for a "run" message and dispatches job-pipeline.yml when it
+# sees one. This is what's left of the old "Resolve Pending Adzuna Replies"
+# workflow after Adzuna stopped being a job source (2026-09, switched to
+# Active Jobs DB via Apify) -- the Adzuna-reply-resolution logic is gone,
+# only the Telegram-polling/dispatch part remains.
+#
+# Latency: up to ~30 minutes, since this rides on a poll interval rather
+# than an instant webhook. Uses the same repo secrets as job-pipeline.yml.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # to commit the Telegram update offset back
+  actions: write     # to dispatch job-pipeline.yml
+
+jobs:
+  poll-telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Write keys.json from secrets
+        run: |
+          cat > keys.json <<'EOF'
+          {
+            "TELEGRAM_BOT_TOKEN": "${{ secrets.TELEGRAM_BOT_TOKEN }}",
+            "TELEGRAM_CHAT_ID": "${{ secrets.TELEGRAM_CHAT_ID }}"
+          }
+          EOF
+
+      - name: Poll Telegram for a "run" message
+        id: poll
+        working-directory: apply_agent
+        run: python3 telegram_poller.py
+
+      - name: Dispatch job-pipeline.yml if a "run" message came in
+        if: steps.poll.outputs.trigger_pipeline == 'true'
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/job-pipeline.yml/dispatches" \
+            -d '{"ref":"${{ github.ref_name }}"}'
+
+      - name: Commit Telegram offset state back to the repo
+        run: |
+          git config user.name "job-agent-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add apply_agent/state 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "Telegram poll: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push || true

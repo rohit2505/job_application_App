@@ -21,12 +21,12 @@ on:
   # No cron for now (2026-09, Rohit's request) — auto-apply is still being
   # validated (Greenhouse blank-form fix, Apify source switch), so runs are
   # manual only: click "Run workflow" in the GitHub UI, or send "run" to the
-  # Telegram bot (resolve-pending.yml polls for that and dispatches this
+  # Telegram bot (telegram-trigger.yml polls for that and dispatches this
   # workflow — see its own comments). Re-add a schedule once auto-apply is
   # trusted; the old RapidAPI-quota-driven weekly cadence no longer applies
   # now that the sole source is Apify (pay-per-result, no monthly cap).
   workflow_dispatch: {}     # lets you click "Run workflow" manually in the GitHub UI,
-                             # or via resolve-pending.yml's API call on a Telegram "run" message
+                             # or via telegram-trigger.yml's API call on a Telegram "run" message
 
 permissions:
   contents: write   # needed to commit state/output back so re-runs don't duplicate
