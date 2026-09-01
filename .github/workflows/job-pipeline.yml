@@ -18,8 +18,11 @@ name: Job Search Pipeline
 #   3. (Optional) adjust the cron schedule below and JOB_QUERY/JOB_LOCATION.
 
 on:
-  schedule:
-    - cron: "0 13 * * *"   # 13:00 UTC daily — adjust to your timezone
+  # schedule disabled for now (paused at Rohit's request while validating the
+  # new Active Jobs DB source / freshness check / Adzuna reply-queue changes)
+  # — re-enable by uncommenting the cron line below.
+  # schedule:
+  #   - cron: "0 13 * * *"   # 13:00 UTC daily — adjust to your timezone
   workflow_dispatch: {}     # lets you click "Run workflow" manually in the GitHub UI
 
 permissions:
