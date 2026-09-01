@@ -3,9 +3,49 @@
 "employer_type": "direct",
 "score": 28
 },
+"https://jobicy.com/jobs/152274-aws-data-engineer-senior-freelancer": {
+"drop": "employer_type:consulting",
+"score": 88
+},
+"https://jobicy.com/jobs/152294-data-engineer-intern": {
+"drop": "employer_type:consulting",
+"score": 42
+},
+"https://jobicy.com/jobs/152296-database-migration-engineer": {
+"drop": "employer_type:consulting",
+"score": 72
+},
 "https://www.adzuna.com/details/5862761720?utm_medium=api&utm_source=ad8b68c8": {
 "employer_type": "direct",
 "score": 88
+},
+"https://www.adzuna.com/details/5863619399?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/details/5863872380?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/details/5864552592?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 72
+},
+"https://www.adzuna.com/details/5864683602?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "employer_type:consulting",
+"score": 78
+},
+"https://www.adzuna.com/details/5864783149?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 82
+},
+"https://www.adzuna.com/details/5864828255?utm_medium=api&utm_source=ad8b68c8": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/details/5865064140?utm_medium=api&utm_source=ad8b68c8": {
+"drop": "employer_type:staffing",
+"score": 78
 },
 "https://www.adzuna.com/land/ad/5863048636?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=BFC1FE033DA593194DE91D6468A5C3DB223AC95A": {
 "drop": "employer_type:consulting",
@@ -31,6 +71,9 @@
 "employer_type": "direct",
 "score": 62
 },
+"https://www.adzuna.com/land/ad/5863217434?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=E0E0FDB2D3763349B2D26F0ED9D147FFACDF90D4": {
+"drop": "staffing_blocklist"
+},
 "https://www.adzuna.com/land/ad/5863217434?se=WuQpLJGl8RGcfKYe_cIpvA&utm_medium=api&utm_source=ad8b68c8&v=E0E0FDB2D3763349B2D26F0ED9D147FFACDF90D4": {
 "drop": "staffing_blocklist"
 },
@@ -45,5 +88,88 @@
 "https://www.adzuna.com/land/ad/5863220482?se=Agm0KpGl8RGlXM1zI2vsKg&utm_medium=api&utm_source=ad8b68c8&v=BC621C413416FA00E0A7F6F8B1DFE5FB91C9C2ED": {
 "drop": "employer_type:staffing",
 "score": 72
+},
+"https://www.adzuna.com/land/ad/5863492314?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=06FAF8C365FA617C15E3A918FFDA80998D6FE8B8": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5863519470?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=4427B4B224CCD1E668A877408727A6B2FB658DBC": {
+"drop": "employer_type:consulting",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5863796056?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=28CF1DEC9B61CB36CC7AA1DF33ACE059D530DA5E": {
+"drop": "employer_type:consulting",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5863984341?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=B390F2560F118388998BD5DD1CA8CE978D1FDAC2": {
+"employer_type": "direct",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5863984945?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=4E7E62E0F03B46F1DF6322E559C112BDF2B3DC82": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5863985046?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=FA54602438BE832E676818E114061A324ABFCF01": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5864091452?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=1112D85ED0405E627CDAE360E242032E8081B0EC": {
+"drop": "employer_type:consulting",
+"score": 42
+},
+"https://www.adzuna.com/land/ad/5864097670?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=0EB31D74F3ED11F8E288D603FF559C6D7E756320": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5864098158?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=4D22848853B72665FB103C055DEB630F9FF26DCD": {
+"employer_type": "direct",
+"score": 42
+},
+"https://www.adzuna.com/land/ad/5864294279?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=D5E5BB85C42AE5EB1E1AA91F1EF8B619ED20017B": {
+"employer_type": "direct",
+"score": 82
+},
+"https://www.adzuna.com/land/ad/5864668503?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=1247581B9B2C46CD95ECB38D997B78EE34FF74F1": {
+"drop": "no_sponsor"
+},
+"https://www.adzuna.com/land/ad/5864789871?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=3D226CE1B8E13C9ED46BAA3D8FFFD8C321DE7640": {
+"employer_type": "direct",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5864812009?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=4F64A9D10B046FBED902731256832B04ED6299A1": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5864816976?se=LsgbMSim8RGCdb4UItyNCQ&utm_medium=api&utm_source=ad8b68c8&v=2D9AF3E8D6C3F2C557B3515EB3599C3549D3B54E": {
+"employer_type": "direct",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5864826117?se=Bjd3NCim8RGUNa3mkcr13g&utm_medium=api&utm_source=ad8b68c8&v=D1252E4FB73E5C4F53B453FE5D8B86F906B8A122": {
+"employer_type": "direct",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5864950011?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=E3807C85554A475900F62B0AA3D72B321A794103": {
+"employer_type": "direct",
+"score": 42
+},
+"https://www.adzuna.com/land/ad/5865028661?se=0LFFOiim8RG5At0T0GlLXQ&utm_medium=api&utm_source=ad8b68c8&v=22C182A0E441DA7F7C7C056CA1198B16259A887C": {
+"drop": "employer_type:consulting",
+"score": 62
+},
+"https://www.adzuna.com/land/ad/5865048906?se=hGKrLiim8RGUNa3mkcr13g&utm_medium=api&utm_source=ad8b68c8&v=51145B4C8A5B367EF801D95235301BDCC738D977": {
+"drop": "employer_type:consulting",
+"score": 72
+},
+"https://www.adzuna.com/land/ad/5865049724?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=0D41DC3DEE867831626D3D8A300D2E1D705698A1": {
+"drop": "employer_type:consulting",
+"score": 78
+},
+"https://www.adzuna.com/land/ad/5865051100?se=hGKrLiim8RGUNa3mkcr13g&utm_medium=api&utm_source=ad8b68c8&v=785F781407803729107BFD241A695F3D93361DB5": {
+"employer_type": "unknown",
+"score": 88
+},
+"https://www.adzuna.com/land/ad/5865051118?se=amUsOCim8RGFAMkHMMa40g&utm_medium=api&utm_source=ad8b68c8&v=EF487C3D2558A0D18F488DF49366F6AC7B10031C": {
+"drop": "employer_type:staffing",
+"score": 78
 }
 }
