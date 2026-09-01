@@ -1169,9 +1169,23 @@ def main():
                 body = (f"Auto-applied to {title} @ {company} (fit {j.get('score')}).\n\n"
                         f"Screening answers given:\n{qa_lines or '(none)'}\n\n"
                         "Confirmation screenshot, resume, and cover letter attached.")
-                send_email(f"Auto-applied: {title} @ {company}", body,
-                           [p_ for p_ in (screenshot, resume_path, cover_path) if p_])
-                print(f"  [applied] {title[:40]} — {company[:20]}")
+                emailed = send_email(f"Auto-applied: {title} @ {company}", body,
+                                     [p_ for p_ in (screenshot, resume_path, cover_path) if p_])
+                print(f"  [applied] {title[:40]} — {company[:20]}"
+                      + ("" if emailed else "  [WARNING: confirmation email FAILED to send — "
+                                             "this is your only record of this real submission]"))
+                if not emailed:
+                    # The confirmation email is the only durable evidence a real
+                    # submission happened — never let that failure be silent.
+                    # Best-effort Telegram fallback so it's not lost entirely.
+                    try:
+                        send_whatsapp(f"⚠️ Auto-applied to {title} @ {company} but the "
+                                      "confirmation EMAIL FAILED to send — check Gmail "
+                                      "creds. This was a real submission with no email "
+                                      "record; screenshot was at "
+                                      f"{screenshot or '(none)'} on the runner (not saved).")
+                    except Exception:
+                        pass
             else:
                 skipped += 1
                 reason = {
