@@ -238,6 +238,8 @@ def main():
                 aa.send_whatsapp(f"✅ Auto-applied to {title} @ {company} using the link you sent!")
             else:
                 reason = {
+                    "stale_listing": "the company's own posting date is much older than "
+                                      "the source claimed — likely stale, skipped.",
                     "not_greenhouse": "that page isn't a Greenhouse or Lever form — "
                                        "not something this can auto-fill, sorry. You'll "
                                        "need to finish this one by hand.",

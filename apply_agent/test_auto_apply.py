@@ -104,6 +104,7 @@ class FakePage:
         self._closed = False
         self._closed_tracker = closed_tracker if closed_tracker is not None else []
         self._title = ""
+        self._content = ""
 
     def goto(self, url, wait_until=None, timeout=None):
         if self._on_goto:
@@ -114,6 +115,9 @@ class FakePage:
 
     def title(self):
         return self._title
+
+    def content(self):
+        return self._content
 
     def get_by_text(self, text, exact=False):
         return FakeLocator(visible=False)
@@ -364,6 +368,62 @@ class MetaRefreshResolutionTests(unittest.TestCase):
         self.assertTrue(any("falling back to click-flow" in a for a in diag["actions"]))
 
 
+class ListingFreshnessTests(unittest.TestCase):
+    """Cross-check the source's claimed posting date against the company
+    page's own schema.org JobPosting datePosted — catches Adzuna (or any
+    aggregator) reporting a job as new when the employer's own listing is
+    actually much older."""
+
+    def _jsonld(self, date_posted):
+        return (
+            '<html><head><script type="application/ld+json">'
+            '{"@context":"https://schema.org/","@type":"JobPosting",'
+            f'"title":"Data Engineer","datePosted":"{date_posted}"'
+            '}</script></head><body></body></html>'
+        )
+
+    def test_fresh_listing_not_flagged(self):
+        job = {"posted": "2026-08-30T00:00:00+00:00"}
+        html = self._jsonld("2026-08-29T00:00:00+00:00")  # 1 day gap
+        page = FakePage(start_url="https://boards.greenhouse.io/acme/jobs/1", context=FakeContext())
+        page._content = html
+        log = []
+        self.assertFalse(aa._check_listing_freshness(page, job, log))
+        self.assertEqual(log, [])
+
+    def test_stale_listing_flagged(self):
+        job = {"posted": "2026-08-30T00:00:00+00:00"}
+        html = self._jsonld("2026-07-01T00:00:00+00:00")  # ~60 day gap
+        page = FakePage(start_url="https://boards.greenhouse.io/acme/jobs/1", context=FakeContext())
+        page._content = html
+        log = []
+        self.assertTrue(aa._check_listing_freshness(page, job, log))
+        self.assertTrue(any("stale_check" in item for item in log))
+
+    def test_no_jsonld_date_never_blocks(self):
+        job = {"posted": "2026-08-30T00:00:00+00:00"}
+        page = FakePage(start_url="https://boards.greenhouse.io/acme/jobs/1", context=FakeContext())
+        page._content = "<html><body>no structured data here</body></html>"
+        log = []
+        self.assertFalse(aa._check_listing_freshness(page, job, log))
+
+    def test_missing_source_date_never_blocks(self):
+        job = {}  # no "posted" field at all
+        page = FakePage(start_url="https://boards.greenhouse.io/acme/jobs/1", context=FakeContext())
+        page._content = self._jsonld("2026-01-01T00:00:00+00:00")
+        log = []
+        self.assertFalse(aa._check_listing_freshness(page, job, log))
+
+    def test_stale_listing_short_circuits_apply_to_resolved_page(self):
+        job = {"posted": "2026-08-30T00:00:00+00:00"}
+        page = FakePage(start_url="https://boards.greenhouse.io/acme/jobs/1", context=FakeContext())
+        page._content = self._jsonld("2026-06-01T00:00:00+00:00")
+        status, log, shot = aa._apply_to_resolved_page(
+            page, "resolved", job, {}, "", None, None, [])
+        self.assertEqual(status, "stale_listing")
+        self.assertIn("stale_listing", aa.PERMANENT_STATUSES)
+
+
 class LeverSupportTests(unittest.TestCase):
     """Lever detection/fill/CAPTCHA-block routing (destination-side — fires
     on a lever.co URL regardless of which source found the job)."""
@@ -413,7 +473,7 @@ class AppliedStateTests(unittest.TestCase):
     """Status -> permanent-seen mapping (item 8/9 of the fix request)."""
 
     def test_permanent_statuses_are_exactly_the_confirmed_outcomes(self):
-        self.assertEqual(aa.PERMANENT_STATUSES, {"applied", "not_greenhouse", "captcha"})
+        self.assertEqual(aa.PERMANENT_STATUSES, {"applied", "not_greenhouse", "captcha", "stale_listing"})
 
     def test_retry_eligible_statuses_excluded(self):
         for status in ("redirect_failed", "error", "unanswered"):

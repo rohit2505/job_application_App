@@ -41,6 +41,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
 try:
     from playwright.sync_api import Error as PWError, TimeoutError as PWTimeoutError
@@ -61,7 +62,7 @@ except Exception:
 # "unanswered" are all transient/retry-eligible and must never be added
 # there, or a bad run (or a temporary Adzuna hiccup) would silently drop a
 # job forever instead of trying again on the next scheduled run.
-PERMANENT_STATUSES = {"applied", "not_greenhouse", "captcha"}
+PERMANENT_STATUSES = {"applied", "not_greenhouse", "captcha", "stale_listing"}
 
 TIMEOUT = 30
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
@@ -928,6 +929,80 @@ def apply_to_job(page, job, profile, resume_text, resume_path, cover_path):
                 pass  # already closed, or never fully opened — fine either way
 
 
+# ---- freshness cross-check ------------------------------------------------
+# Adzuna (and aggregators generally) sometimes report a job as freshly
+# posted when the employer's own listing is actually much older — a stale
+# re-index, not a lie exactly, but it wastes an application on a posting
+# that may already be filled or closed. Most ATS/company job pages embed a
+# schema.org JobPosting block (JSON-LD) with a real "datePosted" — read that
+# straight off the page we already navigated to (no extra request) and
+# compare it against what the source told us.
+_JOBPOSTING_DATE_RE = re.compile(
+    r'"@type"\s*:\s*"JobPosting".{0,2000}?"datePosted"\s*:\s*"([^"]+)"'
+    r'|"datePosted"\s*:\s*"([^"]+)".{0,2000}?"@type"\s*:\s*"JobPosting"',
+    re.IGNORECASE | re.DOTALL)
+
+STALE_LISTING_DAYS = 21  # company page's own date this much older than the
+                          # source's claimed date => treat as stale, skip
+
+
+def _parse_iso_loose(s):
+    if not s:
+        return None
+    s = str(s).strip()
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _extract_company_posted_date(html):
+    """Best-effort schema.org JobPosting datePosted from the page's own
+    HTML. Returns a timezone-aware datetime, or None if not found/parseable
+    (most company pages simply don't include it — that's fine, we just skip
+    the check rather than block on it)."""
+    if not html:
+        return None
+    m = _JOBPOSTING_DATE_RE.search(html)
+    if not m:
+        return None
+    raw = m.group(1) or m.group(2)
+    return _parse_iso_loose(raw)
+
+
+def _check_listing_freshness(page, job, log):
+    """Returns True if this listing looks stale enough to skip (company's
+    own posted date is STALE_LISTING_DAYS+ older than what the source
+    claimed), False otherwise (including "couldn't tell" — never block a
+    real application just because we couldn't find a date)."""
+    source_posted = _parse_iso_loose(job.get("posted"))
+    if not source_posted:
+        return False
+    try:
+        html = page.content()
+    except Exception:
+        return False
+    company_posted = _extract_company_posted_date(html)
+    if not company_posted:
+        return False
+    gap_days = (source_posted - company_posted).total_seconds() / 86400
+    if gap_days >= STALE_LISTING_DAYS:
+        log.append({
+            "stale_check": {
+                "source_posted": source_posted.isoformat(),
+                "company_posted": company_posted.isoformat(),
+                "gap_days": round(gap_days, 1),
+            }
+        })
+        return True
+    return False
+
+
 def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_path, cover_path, log):
     if rstatus == "redirect_failed":
         shot_path = f"/tmp/{slug(job.get('company'))}_{slug(job.get('title'))}_redirect_failed.png"
@@ -937,6 +1012,9 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
             log.append({"error": f"screenshot on redirect_failed also failed: {e}"})
             shot_path = None
         return "redirect_failed", log, shot_path
+
+    if _check_listing_freshness(page, job, log):
+        return "stale_listing", log, None
 
     frame = find_greenhouse_frame(page)
     if frame:
@@ -1098,6 +1176,9 @@ def main():
                 skipped += 1
                 reason = {
                     "not_greenhouse": "not a Greenhouse or Lever form (unsupported ATS)",
+                    "stale_listing": "the company's own posting date is much older than "
+                                      "the source claimed — likely a stale re-index, "
+                                      "skipped rather than wasting an application",
                     "captcha": "CAPTCHA present — will not auto-submit",
                     "unanswered": "a screening question couldn't be answered "
                                   "(Claude was unsure, and Telegram reply didn't "
