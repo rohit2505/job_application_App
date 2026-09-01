@@ -56,20 +56,21 @@ ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
                "jsearch", "himalayas", "activejobsdb", "activejobsdb_apify",
                "greenhouse", "lever", "ashby"]
 
-# 2026-09: switched to Active Jobs DB as the SOLE default source. It's the
-# best direct-apply source we've found — 0% LinkedIn noise, real ATS links
-# (Greenhouse/Lever/Workday/Ashby/etc.) vs. the aggregators (Jobicy, Adzuna,
-# Himalayas, ...) which mostly landed on `not_greenhouse`/`redirect_failed`/
-# `blocked` skips in practice and were never actually auto-fillable anyway.
+# 2026-09: switched to Active Jobs DB (fantastic.jobs) as the SOLE default
+# source — it's the best direct-apply source we've found: 0% LinkedIn noise,
+# real ATS links (Greenhouse/Lever/Ashby/etc.), vs. the aggregators (Jobicy,
+# Adzuna, Himalayas, ...) which mostly landed on `not_greenhouse`/
+# `redirect_failed`/`blocked` skips in practice and were never actually
+# auto-fillable anyway.
 #
-# Its RapidAPI free tier is a hard 250 jobs/month + 25 requests/month, so
-# this ONLY works if: (a) JOB_QUERY is a single query (one request per run,
-# not one per query), and (b) the workflow runs weekly, not daily — see
-# resolve-pending.yml / job-pipeline.yml cron. At limit=50/request and a
-# weekly cadence that's ~4 requests and ~200 jobs/month, safely under both
-# caps. Do NOT re-add daily scheduling or multiple JOB_QUERY entries without
-# re-budgeting this quota first.
-DEFAULT_SOURCES = ["activejobsdb"]
+# Now on the Apify transport (activejobsdb_apify), NOT the RapidAPI one
+# (activejobsdb) — Apify is pay-per-result (~$0.012/job + ~$0.01/run,
+# covered by the $5/month free Apify credit at our current volume) rather
+# than RapidAPI's hard 250 jobs/25 requests per month cap, so there's no
+# quota cliff to budget around. fetch_active_jobs_db_apify() already
+# filters to ats=[greenhouse, lever.co, ashby] since those are the only ATS
+# forms auto_apply.py can currently fill.
+DEFAULT_SOURCES = ["activejobsdb_apify"]
 
 # ==========================================================================  #
 #  LOCAL TESTING KEYS  —  paste your keys here to run on your own machine.
