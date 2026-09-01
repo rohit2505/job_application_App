@@ -332,6 +332,41 @@ class ResolveRealUrlTests(unittest.TestCase):
         self.assertIsNone(frame)
 
 
+class WhiteLabeledGreenhouseFrameTests(unittest.TestCase):
+    """Regression for the 2026-09 Jump Trading bug: a company can white-
+    label its Greenhouse board under its own domain (e.g.
+    jumptrading.com/hr/job?gh_jid=...) embedding a job-boards.greenhouse.io
+    iframe that loads a beat AFTER the page itself — a single immediate
+    check of page.frames can miss it and misreport as 'not_greenhouse'."""
+
+    def test_iframe_appearing_on_second_check_is_still_found(self):
+        page = FakePage(start_url="https://www.example.com/careers/job?gh_jid=123",
+                         context=FakeContext(no_popup=True))
+        page.frames = [FakeFrame(page.url)]  # no greenhouse iframe yet
+
+        calls = {"n": 0}
+        orig_wait = page.wait_for_timeout
+
+        def _wait_then_load_iframe(ms):
+            calls["n"] += 1
+            orig_wait(ms)
+            page.frames = [FakeFrame(page.url),
+                           FakeFrame("https://job-boards.greenhouse.io/embed/job_app?for=acme")]
+
+        page.wait_for_timeout = _wait_then_load_iframe
+        frame = aa.find_greenhouse_frame_with_retry(page, attempts=4, wait_ms=0)
+        self.assertIsNotNone(frame)
+        self.assertIn("greenhouse.io", frame.url)
+        self.assertEqual(calls["n"], 1)
+
+    def test_no_greenhouse_iframe_ever_returns_none(self):
+        page = FakePage(start_url="https://www.example.com/careers/job?id=123",
+                         context=FakeContext(no_popup=True))
+        page.frames = [FakeFrame(page.url)]
+        frame = aa.find_greenhouse_frame_with_retry(page, attempts=3, wait_ms=0)
+        self.assertIsNone(frame)
+
+
 class ChallengePageTests(unittest.TestCase):
     def test_cloudflare_challenge_page_is_blocked_not_not_greenhouse(self):
         """A bot-challenge interstitial (e.g. Cloudflare's 'Just a moment...')

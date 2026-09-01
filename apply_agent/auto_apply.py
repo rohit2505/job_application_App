@@ -647,6 +647,29 @@ def find_greenhouse_frame(page):
     return None
 
 
+def find_greenhouse_frame_with_retry(page, attempts=4, wait_ms=1500):
+    """Some companies white-label their Greenhouse board under their own
+    domain (e.g. jumptrading.com/hr/job?gh_jid=... embedding a
+    job-boards.greenhouse.io/embed/job_app iframe) rather than linking
+    straight to greenhouse.io — and that iframe can load a beat AFTER the
+    page itself, sometimes visibly racing a cookie-consent banner (Osano
+    etc.) for load time. Confirmed live (2026-09, Jump Trading): a single
+    immediate check of page.frames missed the iframe entirely and this got
+    misreported as 'not_greenhouse', even though it's a real, fillable
+    Greenhouse form one JS tick later. Poll a few times with a short wait
+    before giving up, same pattern as the captcha lazy-load fix."""
+    for i in range(attempts):
+        frame = find_greenhouse_frame(page)
+        if frame:
+            return frame
+        if i < attempts - 1:
+            try:
+                page.wait_for_timeout(wait_ms)
+            except Exception:
+                break
+    return None
+
+
 def has_captcha(frame):
     """Detects both reCAPTCHA (Greenhouse) and hCaptcha (seen on some Lever
     boards) — same hard rule either way: if present, stop and fall back to
@@ -1207,7 +1230,7 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
     if _check_listing_freshness(page, job, log):
         return "stale_listing", log, None
 
-    frame = find_greenhouse_frame(page)
+    frame = find_greenhouse_frame_with_retry(page)
     if frame:
         if _captcha_present_with_retry(page, frame):
             return "captcha", log, None
