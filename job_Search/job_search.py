@@ -55,20 +55,20 @@ COMPANIES_FILE = "companies.json"
 ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
                "jsearch", "himalayas", "activejobsdb", "greenhouse", "lever", "ashby"]
 
-# What runs by default: the aggregators + JSearch. The company ATS boards
-# (greenhouse/lever/ashby) are OFF by default — enable with --sources if wanted.
+# 2026-09: switched to Active Jobs DB as the SOLE default source. It's the
+# best direct-apply source we've found — 0% LinkedIn noise, real ATS links
+# (Greenhouse/Lever/Workday/Ashby/etc.) vs. the aggregators (Jobicy, Adzuna,
+# Himalayas, ...) which mostly landed on `not_greenhouse`/`redirect_failed`/
+# `blocked` skips in practice and were never actually auto-fillable anyway.
 #
-# activejobsdb is OFF by default for now too, even though it's the best
-# direct-apply source we've found (0% LinkedIn noise vs. Techmap's 90%) —
-# its RapidAPI free tier is only 250 jobs/month TOTAL, and job_search.py
-# calls each source once per query in JOB_QUERY (currently 7 queries), so a
-# single real run could request up to 7x its per-call limit and blow the
-# entire month's quota in one shot. Re-add it here once either (a) you've
-# upgraded to a paid Active Jobs DB tier, or (b) JOB_QUERY is down to a
-# single query and you're deliberately budgeting the free tier around it.
-# In the meantime: --sources activejobsdb for a one-off manual pull.
-DEFAULT_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse",
-                   "remoteok", "jsearch", "himalayas"]
+# Its RapidAPI free tier is a hard 250 jobs/month + 25 requests/month, so
+# this ONLY works if: (a) JOB_QUERY is a single query (one request per run,
+# not one per query), and (b) the workflow runs weekly, not daily — see
+# resolve-pending.yml / job-pipeline.yml cron. At limit=50/request and a
+# weekly cadence that's ~4 requests and ~200 jobs/month, safely under both
+# caps. Do NOT re-add daily scheduling or multiple JOB_QUERY entries without
+# re-budgeting this quota first.
+DEFAULT_SOURCES = ["activejobsdb"]
 
 # ==========================================================================  #
 #  LOCAL TESTING KEYS  —  paste your keys here to run on your own machine.
@@ -729,7 +729,7 @@ def fetch_active_jobs_db(query, now, window_min, location=None):
     loc_q = f'"{location}"' if location else '"United States"'
     params = {
         "time_frame": time_frame,
-        "limit": 50,        # free tier is only 250 jobs/month total — stay modest
+        "limit": 50,        # weekly cadence * limit=50 ~= 200 jobs/month, under the 250/mo cap
         "offset": 0,
         "description_format": "text",
         "title": f'"{query}"',

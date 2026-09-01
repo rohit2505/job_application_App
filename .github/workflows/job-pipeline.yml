@@ -18,20 +18,26 @@ name: Job Search Pipeline
 #   3. (Optional) adjust the cron schedule below and JOB_QUERY/JOB_LOCATION.
 
 on:
-  # schedule disabled for now (paused at Rohit's request while validating the
-  # new Active Jobs DB source / freshness check / Adzuna reply-queue changes)
-  # — re-enable by uncommenting the cron line below.
-  # schedule:
-  #   - cron: "0 13 * * *"   # 13:00 UTC daily — adjust to your timezone
+  # Weekly, not daily: the sole source now is Active Jobs DB, whose RapidAPI
+  # free tier is a hard 250 jobs/month + 25 requests/month. One query * one
+  # request/run * weekly = ~4 requests + ~200 jobs/month, safely under both
+  # caps. time_frame is 7d in job_search.py so there's no gap between runs.
+  # Don't switch this back to daily (or add more JOB_QUERY entries) without
+  # re-budgeting the quota first.
+  schedule:
+    - cron: "0 13 * * 1"   # 13:00 UTC every Monday — adjust to your timezone
   workflow_dispatch: {}     # lets you click "Run workflow" manually in the GitHub UI
 
 permissions:
   contents: write   # needed to commit state/output back so re-runs don't duplicate
 
 env:
-  JOB_QUERY: "data engineer,analytics engineer,etl developer,data platform engineer,BI engineer,data architect,senior data engineer"
+  # Single query — Active Jobs DB's free tier is 25 requests/month and
+  # job_search.py calls the source once per JOB_QUERY entry, so more than
+  # one query here multiplies straight into the quota.
+  JOB_QUERY: "data engineer"
   JOB_LOCATION: "United States"
-  WINDOW_MIN: "1440"          # look back 24h since this runs daily
+  WINDOW_MIN: "10080"         # look back 7d — matches the weekly cadence
   MIN_SALARY: "160000"
   MIN_SCORE: "70"
   TOP: "10"
