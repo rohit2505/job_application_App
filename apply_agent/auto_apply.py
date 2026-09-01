@@ -141,20 +141,23 @@ def slug(s, n=40):
 # message limits, no expiring sandbox (unlike the Twilio WhatsApp sandbox).
 # --------------------------------------------------------------------------- #
 def send_whatsapp(body):
-    """Name kept for call-site compatibility; sends via Telegram now."""
+    """Name kept for call-site compatibility; sends via Telegram now.
+    Returns (ok, detail, message_id) — message_id lets a caller track a
+    specific outgoing message (e.g. to match a later reply to it)."""
     token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
     if not (token and chat_id):
-        return False
+        return False, "telegram creds not set", None
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": body}).encode()
     req = urllib.request.Request(url, data=data)
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
-            json.loads(r.read().decode())
-        return True
+            resp = json.loads(r.read().decode())
+        message_id = (resp.get("result") or {}).get("message_id")
+        return True, "sent", message_id
     except Exception as e:
         print(f"  [telegram] send error: {e}", file=sys.stderr)
-        return False
+        return False, f"send error: {e}", None
 
 
 def wait_for_whatsapp_reply(after_ts, timeout_s=WHATSAPP_WAIT_SECONDS):
@@ -850,7 +853,7 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
         # a blank required question.
         for item in unanswered:
             asked_at = time.time()
-            sent = send_whatsapp(
+            sent, _detail, _msg_id = send_whatsapp(
                 f"🧑‍💻 Stuck on {job.get('company','')} application:\n"
                 f"\"{item['question']}\"\nReply with your answer.")
             if not sent:

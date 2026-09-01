@@ -26,6 +26,8 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+
+import adzuna_queue
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -278,6 +280,10 @@ def main():
                     PENDING_RESOLUTION_FILE_DEFAULT),
                     help="tracks Telegram message_id -> Adzuna job, so a reply with the "
                          "resolved employer URL can be picked up by resolve_pending.py")
+    ap.add_argument("--queue-file", default=os.environ.get("ADZUNA_QUEUE_FILE",
+                    adzuna_queue.QUEUE_FILE_DEFAULT),
+                    help="Adzuna jobs waiting their turn for a 'reply with the URL' ask — "
+                         "only one ask is ever outstanding at once")
     ap.add_argument("--keepalive", action="store_true",
                     help="(legacy no-op) Telegram has no expiring session, unlike the old "
                          "Twilio WhatsApp sandbox, so there's nothing to keep alive")
@@ -330,6 +336,8 @@ def main():
             # phone/browser always gets past it. Ask for that one click back,
             # via Telegram's native "reply" so we know exactly which job it's
             # for, and hand the resulting real URL straight to auto-apply.
+            # Only one such ask is ever outstanding at a time (see
+            # adzuna_queue.py) — this just joins the queue, doesn't send yet.
             tg_text = (f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
                        f"Open: {link}\n\n"
                        "This one needs a real click to get past Adzuna's redirect — "
@@ -337,18 +345,20 @@ def main():
                        "REPLY to THIS message with that final URL and I'll take it "
                        "from there (fill + submit automatically where supported).\n"
                        + ("(resume + cover letter below)" if attachments else "(resume in your email)"))
-        else:
-            tg_text = (f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
-                       f"Apply: {link}\n"
-                       + ("(resume + cover letter below)" if attachments else "(resume in your email)"))
+            adzuna_queue.enqueue(j, resume, cover, tg_text, queue_path=args.queue_file)
+            if emailed:
+                seen.add(jid)
+                sent += 1
+                print(f"  queued (Adzuna ask, waiting its turn): [{j.get('score')}] "
+                      f"{title[:40]} — {company[:22]}")
+            continue
+
+        tg_text = (f"🧑‍💻 {title} @ {company} (fit {j.get('score')})\n"
+                   f"Apply: {link}\n"
+                   + ("(resume + cover letter below)" if attachments else "(resume in your email)"))
         tg_ok, detail, tg_message_id = send_whatsapp(tg_text)
         if not tg_ok and emailed:
             print(f"  [telegram] not delivered ({detail}) — job is in your email.", file=sys.stderr)
-        if tg_ok and is_adzuna and tg_message_id:
-            pending[str(tg_message_id)] = {
-                "job": j, "resume": resume, "cover": cover,
-                "notified_at": time.time(),
-            }
         if tg_ok:
             for path, label in ((resume, "Resume"), (cover, "Cover letter")):
                 if not path:
@@ -366,6 +376,23 @@ def main():
 
     save_seen(args.seen_file, seen)
     save_pending(args.pending_file, pending)
+
+    # Drain one queued Adzuna ask, but only if nothing is currently awaiting
+    # a reply — keeps exactly one outstanding at a time.
+    q_status, q_entry = adzuna_queue.send_next_if_idle(
+        send_whatsapp, queue_path=args.queue_file, pending_path=args.pending_file)
+    print(f"  [adzuna queue] {q_status}")
+    if q_entry:
+        qjob = q_entry["job"]
+        for path, label in ((q_entry.get("resume"), "Resume"), (q_entry.get("cover"), "Cover letter")):
+            if not path:
+                continue
+            doc_ok, doc_detail = send_telegram_document(
+                path, caption=f"{label} — {qjob.get('title','')} @ {qjob.get('company','')}")
+            if not doc_ok:
+                print(f"  [telegram] {label.lower()} not delivered ({doc_detail}) "
+                      "— it's in your email.", file=sys.stderr)
+
     print(f"\nNotified {sent} new job(s).")
 
 

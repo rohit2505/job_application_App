@@ -37,6 +37,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_apply as aa  # noqa: E402
+import adzuna_queue  # noqa: E402
 
 TIMEOUT = 30
 _URL_RE = re.compile(r"https?://[^\s]+")
@@ -138,13 +139,23 @@ def main():
     ap.add_argument("--profile", default=os.environ.get("PROFILE_FILE", "../profile.json"))
     ap.add_argument("--success-file", default=os.environ.get("APPLIED_SUCCESS_FILE",
                     "state/auto_applied_success.json"))
+    ap.add_argument("--queue-file", default=os.environ.get("ADZUNA_QUEUE_FILE",
+                    adzuna_queue.QUEUE_FILE_DEFAULT))
     ap.add_argument("--headless", action="store_true", default=False)
     args = ap.parse_args()
 
     pending = load_json(args.pending_file, {})
     if not pending:
-        print("  Nothing pending — no Adzuna jobs waiting on a resolved URL.")
-        return
+        # Nothing outstanding — this is exactly when a queued Adzuna job (if
+        # any) should get its ask sent, rather than waiting for the once-a-
+        # day apply_notifier.py run.
+        q_status, _q_entry = adzuna_queue.send_next_if_idle(
+            aa.send_whatsapp, queue_path=args.queue_file, pending_path=args.pending_file)
+        print(f"  [adzuna queue] {q_status}")
+        pending = load_json(args.pending_file, {})
+        if not pending:
+            print("  Nothing pending — no Adzuna jobs waiting on a resolved URL.")
+            return
 
     offset_state = load_json(args.offset_file, {})
     offset = offset_state.get("offset")
@@ -242,6 +253,14 @@ def main():
     save_json(args.pending_file, pending)
     save_json(args.offset_file, {"offset": new_offset})
     save_json(args.success_file, sorted(success))
+
+    # A reply was just resolved, so the queue may no longer be "busy" —
+    # advance to the next queued Adzuna ask right away instead of waiting
+    # for the next apply_notifier.py run.
+    q_status, _q_entry = adzuna_queue.send_next_if_idle(
+        aa.send_whatsapp, queue_path=args.queue_file, pending_path=args.pending_file)
+    print(f"  [adzuna queue] {q_status}")
+
     print(f"\nResolved {len(matched)} repl{'y' if len(matched)==1 else 'ies'}, "
           f"{resolved_count} auto-applied.")
 
