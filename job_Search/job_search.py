@@ -53,7 +53,8 @@ DEFAULT_SEEN_FILE = "state/seen.json"
 COMPANIES_FILE = "companies.json"
 
 ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
-               "jsearch", "himalayas", "activejobsdb", "greenhouse", "lever", "ashby"]
+               "jsearch", "himalayas", "activejobsdb", "activejobsdb_apify",
+               "greenhouse", "lever", "ashby"]
 
 # 2026-09: switched to Active Jobs DB as the SOLE default source. It's the
 # best direct-apply source we've found — 0% LinkedIn noise, real ATS links
@@ -194,6 +195,28 @@ def get_json_with_headers(url, headers=None):
         except Exception:
             body = ""
         err = RuntimeError(f"HTTP {e.code} {e.reason} — {body}")
+        err.headers = dict(e.headers) if e.headers else {}
+        err.code = e.code
+        raise err from None
+
+
+def post_json_with_headers(url, payload, headers=None):
+    """POST a JSON body and return (parsed_response, response_headers). Used
+    by APIs (e.g. Apify's run-sync-get-dataset-items) that take a JSON POST
+    body rather than query params."""
+    body = json.dumps(payload).encode("utf-8")
+    hdrs = {"User-Agent": "job-search-agent/1.0", "Content-Type": "application/json"}
+    hdrs.update(headers or {})
+    req = urllib.request.Request(url, data=body, headers=hdrs, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=max(TIMEOUT, 60), context=SSL_CTX) as resp:
+            return json.loads(resp.read().decode("utf-8")), dict(resp.headers)
+    except urllib.error.HTTPError as e:
+        try:
+            errbody = e.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            errbody = ""
+        err = RuntimeError(f"HTTP {e.code} {e.reason} — {errbody}")
         err.headers = dict(e.headers) if e.headers else {}
         err.code = e.code
         raise err from None
@@ -781,6 +804,81 @@ def fetch_active_jobs_db(query, now, window_min, location=None):
     return out
 
 
+_UNIT_TO_ANNUAL = {"YEAR": 1, "MONTH": 12, "WEEK": 52, "DAY": 260, "HOUR": 2080}
+
+
+def _map_active_jobs_db_row(j, now, window_min, source_tag="activejobsdb"):
+    """Shared row-mapper for the Active Jobs DB (fantastic.jobs) schema,
+    used by both the RapidAPI transport (fetch_active_jobs_db) and the Apify
+    transport (fetch_active_jobs_db_apify) — same underlying dataset, same
+    field names, just a different way of calling it."""
+    posted = parse_iso(j.get("date_posted"))
+    if not in_window(posted, now, window_min):
+        return None
+    title = j.get("title", "")
+    desc = j.get("description_text", "")
+    loc_str = ", ".join(j.get("locations_derived") or []) or "—"
+    unit_mult = _UNIT_TO_ANNUAL.get(str(j.get("ai_salary_unit_text") or "YEAR").upper(), 1)
+    smin_raw, smax_raw = j.get("ai_salary_min_value"), j.get("ai_salary_max_value")
+    smin = smin_raw * unit_mult if smin_raw else None
+    smax = smax_raw * unit_mult if smax_raw else None
+    salary = format_salary_range(smin, smax)
+    arrangement = (j.get("ai_work_arrangement") or "").lower()
+    is_remote = "remote" in arrangement
+    visa = str(j.get("ai_visa_sponsorship") or "").strip().lower()
+    no_sponsor = visa in ("no", "false", "not offered", "none", "not available")
+    return job(source_tag, title, j.get("organization"), loc_str,
+               j.get("url"), salary=salary,
+               tags=[j.get("source")] if j.get("source") else [],
+               remote=is_remote, posted=posted,
+               no_sponsor=no_sponsor or rejects_sponsorship(title, desc),
+               us_guaranteed=("United States" in (j.get("countries_derived") or [])),
+               salary_min=smin, salary_max=smax, description=desc)
+
+
+def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
+    """Same fantastic.jobs dataset as fetch_active_jobs_db, but via Apify's
+    pay-per-result actor (fantastic-jobs/career-site-job-listing-api)
+    instead of the RapidAPI free tier. No hard monthly cap here — cost is
+    ~$0.012/job + ~$0.01/run instead, billed to your Apify account. Filters
+    to Greenhouse/Lever/Ashby by default since those are the only ATS forms
+    auto_apply.py can currently fill.
+    """
+    token = cfg("APIFY_TOKEN")
+    if not token:
+        print("  [activejobsdb_apify] skipped — set APIFY_TOKEN")
+        return []
+    time_frame = "24h" if window_min <= 1440 else ("7d" if window_min <= 10080 else "6m")
+    limit = 15  # keep runs cheap by default — override by editing this call site
+    ats_filter = ats if ats is not None else ["greenhouse", "lever.co", "ashby"]
+    payload = {
+        "timeRange": time_frame,
+        "limit": limit,
+        "titleSearch": [query],
+        "locationSearch": [location or "United States"],
+        "descriptionType": "text",
+    }
+    if ats_filter:
+        payload["ats"] = ats_filter
+    actor_id = "fantastic-jobs~career-site-job-listing-api"
+    url = (f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+           f"?token={token}")
+    try:
+        resp, _headers = post_json_with_headers(url, payload)
+    except RuntimeError as e:
+        print(f"  [activejobsdb_apify] error: {e}")
+        return []
+    rows = resp if isinstance(resp, list) else []
+    out = []
+    for j in rows:
+        if not isinstance(j, dict):
+            continue
+        mapped = _map_active_jobs_db_row(j, now, window_min, source_tag="activejobsdb_apify")
+        if mapped:
+            out.append(mapped)
+    return out
+
+
 def fetch_jobicy(query, now, window_min):
     # Remote-only board with a geo=usa filter — ideal for US-remote roles.
     url = "https://jobicy.com/api/v2/remote-jobs?" + urllib.parse.urlencode(
@@ -1280,6 +1378,7 @@ def main():
             "remoteok": lambda: fetch_remoteok(q, now, w),
             "himalayas": lambda: fetch_himalayas(q, now, w),
             "activejobsdb": lambda: fetch_active_jobs_db(q, now, w, location=args.location),
+            "activejobsdb_apify": lambda: fetch_active_jobs_db_apify(q, now, w, location=args.location),
             "greenhouse": lambda: fetch_greenhouse(q, now, w, companies["greenhouse"]),
             "lever": lambda: fetch_lever(q, now, w, companies["lever"]),
             "ashby": lambda: fetch_ashby(q, now, w, companies["ashby"]),
