@@ -22,6 +22,18 @@
 "employer_type": "direct",
 "score": 88
 },
+"https://job-boards.greenhouse.io/penninteractive/jobs/6179102004": {
+"employer_type": "direct",
+"score": 88
+},
+"https://job-boards.greenhouse.io/spearmintenergy/jobs/4393136009": {
+"employer_type": "direct",
+"score": 88
+},
+"https://job-boards.greenhouse.io/transmarketgroup/jobs/5151492007?gh_jid=5151492007": {
+"employer_type": "direct",
+"score": 42
+},
 "https://jobicy.com/jobs/152257-director-specialist-sales-engineering-data-security": {
 "employer_type": "direct",
 "score": 28
@@ -54,11 +66,23 @@
 "employer_type": "direct",
 "score": 88
 },
+"https://jobs.ashbyhq.com/gravie/ae035962-5696-43fe-9eb9-fa891860c8a3": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobs.ashbyhq.com/wynd-labs/216d74ef-d925-4bf1-ae4f-9eedc3e145f8": {
+"employer_type": "direct",
+"score": 78
+},
 "https://jobs.lever.co/jobgether/ab8867bb-5281-42da-bb9d-c1b3ed95f1aa": {
 "drop": "employer_type:staffing",
 "score": 78
 },
 "https://jobs.lever.co/thinkahead/a9d8745f-8ba6-4a98-9d90-b7ed3466e032": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobs.lever.co/virtualitics/ebbed389-467c-486d-968a-072c4c884094": {
 "employer_type": "direct",
 "score": 88
 },
