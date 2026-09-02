@@ -14,14 +14,6 @@
 "drop": "employer_type:consulting",
 "score": 52
 },
-"https://job-boards.greenhouse.io/doordashusa/jobs/8168866": {
-"employer_type": "direct",
-"score": 88
-},
-"https://job-boards.greenhouse.io/incidentiq/jobs/7741633003": {
-"employer_type": "direct",
-"score": 88
-},
 "https://job-boards.greenhouse.io/penninteractive/jobs/6179102004": {
 "employer_type": "direct",
 "score": 88
@@ -77,10 +69,6 @@
 "https://jobs.lever.co/jobgether/ab8867bb-5281-42da-bb9d-c1b3ed95f1aa": {
 "drop": "employer_type:staffing",
 "score": 78
-},
-"https://jobs.lever.co/thinkahead/a9d8745f-8ba6-4a98-9d90-b7ed3466e032": {
-"employer_type": "direct",
-"score": 88
 },
 "https://jobs.lever.co/virtualitics/ebbed389-467c-486d-968a-072c4c884094": {
 "employer_type": "direct",
