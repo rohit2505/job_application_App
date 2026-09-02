@@ -15,6 +15,9 @@ name: Job Search Pipeline
 #        ADZUNA_APP_ID, ADZUNA_APP_KEY, RAPIDAPI_KEY, MUSE_API_KEY,
 #        ANTHROPIC_API_KEY, GMAIL_ADDRESS, GMAIL_APP_PASSWORD, DIGEST_TO,
 #        TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (optional, for screening-question escalation)
+#        VPS_HOST, VPS_SSH_KEY, VPS_NOVNC_URL, VPS_NOVNC_PASSWORD (optional, for the
+#        CAPTCHA remote-browser hand-off — without these, a CAPTCHA just falls back
+#        to the old "captcha" status, unchanged)
 #   3. (Optional) adjust the cron schedule below and JOB_QUERY/JOB_LOCATION.
 
 on:
@@ -119,8 +122,42 @@ jobs:
             --top "$TOP" \
             --regenerate
 
+      - name: Set up VPS SSH key (for the CAPTCHA remote-browser hand-off)
+        if: ${{ secrets.VPS_HOST != '' }}
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/vps_key <<'EOF'
+          ${{ secrets.VPS_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Open SSH tunnel to the VPS browser's CDP port
+        if: ${{ secrets.VPS_HOST != '' }}
+        run: |
+          # Backgrounded (-f) and never dies with this step — stays open for
+          # the rest of the job so Stage 4 can reach the VPS's Chromium at
+          # localhost:9222. The VPS's own CDP port is bound to 127.0.0.1
+          # there and is never exposed publicly; this tunnel is the only way
+          # in, over SSH.
+          ssh -f -N -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            -i ~/.ssh/vps_key -L 9222:127.0.0.1:9222 \
+            ubuntu@${{ secrets.VPS_HOST }}
+          sleep 2
+          curl -sf http://localhost:9222/json/version || echo "  [vps-tunnel] warm-up check failed (non-fatal — auto_apply.py falls back to plain 'captcha' status if the VPS is unreachable)"
+
       - name: Stage 4 — auto-apply (Greenhouse only, CAPTCHA-safe)
         working-directory: apply_agent
+        env:
+          # Unset (empty secrets) unless VPS_HOST is configured — this is the
+          # opt-in switch escalate_to_remote_browser() checks. When empty, a
+          # CAPTCHA just falls back to the original "captcha" status exactly
+          # as before this feature existed.
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY_PATH: /home/runner/.ssh/vps_key  # ubuntu-latest's default HOME
+          VPS_SSH_USER: ubuntu
+          VPS_NOVNC_URL: ${{ secrets.VPS_NOVNC_URL }}
+          VPS_NOVNC_PASSWORD: ${{ secrets.VPS_NOVNC_PASSWORD }}
         run: |
           # xvfb-run + a headed browser: Adzuna's own /land/ad/... redirect
           # page does a client-side JS redirect that doesn't fire for headless

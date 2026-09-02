@@ -38,6 +38,15 @@ repository secret.** Add each of these (values from your local `keys.json`):
 - `GMAIL_ADDRESS`
 - `GMAIL_APP_PASSWORD`
 - `DIGEST_TO`
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (optional — lets auto-apply text you on
+  Telegram for screening questions it can't answer from your resume)
+- `VPS_HOST`, `VPS_SSH_KEY`, `VPS_NOVNC_URL`, `VPS_NOVNC_PASSWORD` (optional — only
+  needed for the CAPTCHA remote-browser hand-off. `VPS_SSH_KEY` is the full contents
+  of the *private* key file used to SSH into your VPS (e.g.
+  `oracle_oci/ovhcloud_vm/sshkey20260902.key`) — paste the whole file, including the
+  `-----BEGIN...`/`-----END...` lines. Without these four secrets set, a CAPTCHA just
+  falls back to the plain "captcha" status and emails you the job like before — this
+  feature is fully opt-in.)
 
 ## 3. Set up the Gmail label/filter (do this once)
 

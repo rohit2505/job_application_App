@@ -62,7 +62,7 @@ except Exception:
 # "unanswered" are all transient/retry-eligible and must never be added
 # there, or a bad run (or a temporary Adzuna hiccup) would silently drop a
 # job forever instead of trying again on the next scheduled run.
-PERMANENT_STATUSES = {"applied", "not_greenhouse", "captcha", "stale_listing"}
+PERMANENT_STATUSES = {"applied", "not_greenhouse", "captcha", "stale_listing", "escalated_remote"}
 
 TIMEOUT = 30
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
@@ -221,6 +221,153 @@ def send_email(subject, text_body, attach_paths=None):
     except Exception as e:
         print(f"  [email] error: {e}", file=sys.stderr)
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Remote-browser escalation — when a CAPTCHA blocks an otherwise-fillable
+# Greenhouse/Lever form, hand the (already-filled) form off to a browser
+# running on our own VPS instead of just giving up. The VPS's Chromium is
+# reached over an SSH tunnel already opened as a separate CI step (its CDP
+# debug port is bound to 127.0.0.1 on the VPS and never exposed publicly).
+# We fill everything here, exactly like the normal flow, but never submit
+# — you finish (solve the captcha, click submit) yourself from the noVNC
+# link this sends to Telegram, from any device including your phone.
+#
+# This never bypasses or solves the CAPTCHA itself — it only saves you the
+# hassle of re-filling the form and re-attaching files on a small screen.
+#
+# Disabled (falls straight back to the old "captcha" status) unless
+# VPS_HOST is configured — so this is fully opt-in and never breaks the
+# existing flow if the VPS isn't set up.
+# --------------------------------------------------------------------------- #
+def _scp_to_vps(local_path, remote_dir, ssh_key, ssh_user, vps_host, port):
+    import subprocess
+    if not (local_path and os.path.exists(local_path)):
+        return None
+    remote_name = os.path.basename(local_path)
+    remote_path = f"{remote_dir}/{remote_name}"
+    cmd = [
+        "scp", "-i", ssh_key, "-P", str(port),
+        "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15",
+        local_path, f"{ssh_user}@{vps_host}:{remote_path}",
+    ]
+    try:
+        subprocess.run(cmd, check=True, timeout=60, capture_output=True)
+        return remote_path
+    except Exception as e:
+        print(f"  [vps-escalate] scp failed for {local_path}: {e}", file=sys.stderr)
+        return None
+
+
+def _ssh_rm_on_vps(remote_paths, ssh_key, ssh_user, vps_host, port):
+    import subprocess
+    remote_paths = [p for p in remote_paths if p]
+    if not remote_paths:
+        return
+    cmd = [
+        "ssh", "-i", ssh_key, "-p", str(port),
+        "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15",
+        f"{ssh_user}@{vps_host}", "rm", "-f", *remote_paths,
+    ]
+    try:
+        subprocess.run(cmd, timeout=30, capture_output=True)
+    except Exception as e:
+        print(f"  [vps-escalate] cleanup ssh rm failed (non-fatal): {e}", file=sys.stderr)
+
+
+def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cover_path, log):
+    """Fills the same Greenhouse/Lever form on the VPS's browser instead of
+    giving up on CAPTCHA. Returns True if the hand-off succeeded (form
+    filled, you were notified) — caller should record status
+    'escalated_remote' in that case. Returns False if anything about the
+    remote hand-off itself failed, so the caller falls back to the plain
+    'captcha' status as before."""
+    vps_host = cfg("VPS_HOST")
+    if not vps_host:
+        return False  # feature not configured — behave exactly as before
+
+    ssh_key = cfg("VPS_SSH_KEY_PATH") or os.path.expanduser("~/.ssh/vps_key")
+    ssh_user = cfg("VPS_SSH_USER") or "ubuntu"
+    ssh_port = int(cfg("VPS_SSH_PORT") or 22)
+    cdp_port = int(cfg("VPS_CDP_LOCAL_PORT") or 9222)  # local end of the already-open tunnel
+    remote_dir = cfg("VPS_REMOTE_UPLOAD_DIR") or "/home/ubuntu/uploads"
+    novnc_url = cfg("VPS_NOVNC_URL") or f"http://{vps_host}:6080/vnc.html"
+    novnc_password = cfg("VPS_NOVNC_PASSWORD") or ""
+
+    title, company = job.get("title", ""), job.get("company", "")
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        print(f"  [vps-escalate] playwright unavailable: {e}", file=sys.stderr)
+        return False
+
+    # Make sure the upload dir exists on the VPS, then copy the resume/
+    # cover letter over — the remote Chromium needs these files local to
+    # its own machine to attach them, not just reachable from the CI runner.
+    import subprocess
+    try:
+        subprocess.run(
+            ["ssh", "-i", ssh_key, "-p", str(ssh_port), "-o", "StrictHostKeyChecking=no",
+             "-o", "ConnectTimeout=15", f"{ssh_user}@{vps_host}", "mkdir", "-p", remote_dir],
+            timeout=20, check=True, capture_output=True,
+        )
+    except Exception as e:
+        print(f"  [vps-escalate] could not prep remote upload dir: {e}", file=sys.stderr)
+        return False
+
+    remote_resume = _scp_to_vps(resume_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
+    remote_cover = _scp_to_vps(cover_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
+    uploaded_remote_paths = [p for p in (remote_resume, remote_cover) if p]
+
+    filled_ok = False
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+            rpage = context.new_page()
+            rpage.goto(url, timeout=45000)
+
+            gframe = find_greenhouse_frame_with_retry(rpage)
+            if gframe:
+                fill_greenhouse_form(gframe, job, profile, resume_text,
+                                      remote_resume or resume_path,
+                                      remote_cover or cover_path, log)
+                filled_ok = True
+            else:
+                lframe = find_lever_form(rpage)
+                if lframe:
+                    fill_lever_form(lframe, job, profile, resume_text,
+                                     remote_resume or resume_path,
+                                     remote_cover or cover_path, log)
+                    filled_ok = True
+            # Deliberately no submit here — a human finishes this from
+            # the noVNC link below (captcha + final click are theirs).
+    except Exception as e:
+        print(f"  [vps-escalate] remote fill failed: {e}", file=sys.stderr)
+        log.append({"vps_escalate_error": str(e)})
+    finally:
+        # Best-effort cleanup regardless of outcome — never leave the
+        # resume/cover letter sitting on the VPS.
+        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
+
+    if not filled_ok:
+        return False
+
+    pw_note = f"\nVNC password: {novnc_password}" if novnc_password else ""
+    send_whatsapp(
+        f"🖥️ Filled but hit a CAPTCHA — {title} @ {company}\n"
+        f"Finish it here (solve the captcha, hit submit):\n{novnc_url}{pw_note}"
+    )
+    send_email(
+        f"[Action needed] {title} @ {company}",
+        f"Form filled but blocked by a CAPTCHA. Finish it yourself here:\n{novnc_url}\n\n"
+        f"Job link: {url}\n\n"
+        f"Resume and cover letter attached for your records.",
+        [resume_path, cover_path],
+    )
+    return True
+
 
 
 # --------------------------------------------------------------------------- #
@@ -1034,6 +1181,8 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
                 pass
 
     if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
+        if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+            return "escalated_remote", log, None
         return "captcha", log, None
 
     # Never submit unless the required fields genuinely took a value — this
@@ -1233,6 +1382,8 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
     frame = find_greenhouse_frame_with_retry(page)
     if frame:
         if _captcha_present_with_retry(page, frame):
+            if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+                return "escalated_remote", log, None
             return "captcha", log, None
         fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log)
@@ -1240,6 +1391,8 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
     lever_frame = find_lever_form(page)
     if lever_frame:
         if _captcha_present_with_retry(page, lever_frame):
+            if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+                return "escalated_remote", log, None
             return "captcha", log, None
         fill_lever_form(lever_frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, lever_frame, job, profile, resume_text, resume_path, cover_path, log)

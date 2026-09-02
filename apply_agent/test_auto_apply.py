@@ -19,6 +19,7 @@ Covers the scenarios called out in the fix request:
 import os
 import sys
 import unittest
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_apply as aa  # noqa: E402
@@ -645,7 +646,7 @@ class AppliedStateTests(unittest.TestCase):
     """Status -> permanent-seen mapping (item 8/9 of the fix request)."""
 
     def test_permanent_statuses_are_exactly_the_confirmed_outcomes(self):
-        self.assertEqual(aa.PERMANENT_STATUSES, {"applied", "not_greenhouse", "captcha", "stale_listing"})
+        self.assertEqual(aa.PERMANENT_STATUSES, {"applied", "not_greenhouse", "captcha", "stale_listing", "escalated_remote"})
 
     def test_retry_eligible_statuses_excluded(self):
         for status in ("redirect_failed", "error", "unanswered"):
@@ -768,6 +769,95 @@ class ResolveTelegramReplyTests(unittest.TestCase):
             "Have you done X?", "resume", {})
         self.assertEqual(final, "Yes, at my last company I built the whole reporting pipeline.")
         self.assertEqual(source, "telegram")
+
+class RemoteEscalationTests(unittest.TestCase):
+    """escalate_to_remote_browser() — the CAPTCHA hand-off to our own VPS
+    browser. All subprocess/CDP calls are mocked; no real network, SSH, or
+    browser involved. Automation must still never solve/click through a
+    CAPTCHA itself: these tests only check the fill-and-notify hand-off,
+    never a submit call."""
+
+    def setUp(self):
+        self.job = {"title": "Data Engineer", "company": "Acme"}
+        self.profile = {}
+        self.log = []
+
+    def test_disabled_when_vps_host_not_configured(self):
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("subprocess.run") as mock_run:
+            result = aa.escalate_to_remote_browser(
+                "https://boards.greenhouse.io/acme/jobs/1", self.job,
+                self.profile, "resume text", "/tmp/resume.pdf", "/tmp/cover.pdf",
+                self.log)
+        self.assertFalse(result)
+        mock_run.assert_not_called()
+
+    def test_successful_fill_notifies_and_cleans_up_uploaded_files(self):
+        env = {
+            "VPS_HOST": "40.160.138.169",
+            "VPS_SSH_KEY_PATH": "/tmp/fake_key",
+            "VPS_NOVNC_URL": "http://40.160.138.169:6080/vnc.html",
+            "VPS_NOVNC_PASSWORD": "Rohit534",
+        }
+        fake_frame = object()
+        fake_browser = MagicMock()
+        fake_context = MagicMock()
+        fake_browser.contexts = [fake_context]
+        fake_page = MagicMock()
+        fake_context.new_page.return_value = fake_page
+
+        fake_playwright_cm = MagicMock()
+        fake_playwright_cm.chromium.connect_over_cdp.return_value = fake_browser
+        fake_sync_playwright = MagicMock()
+        fake_sync_playwright.return_value.__enter__.return_value = fake_playwright_cm
+
+        fake_pw_module = MagicMock()
+        fake_pw_module.sync_playwright = fake_sync_playwright
+        with patch.dict(os.environ, env, clear=True), \
+             patch.dict(sys.modules, {"playwright.sync_api": fake_pw_module}), \
+             patch("subprocess.run") as mock_run, \
+             patch("auto_apply.os.path.exists", return_value=True), \
+             patch("auto_apply.find_greenhouse_frame_with_retry", return_value=fake_frame), \
+             patch("auto_apply.fill_greenhouse_form") as mock_fill, \
+             patch("auto_apply.send_whatsapp", return_value=(True, "ok", "1")) as mock_wa, \
+             patch("auto_apply.send_email", return_value=True) as mock_email:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = aa.escalate_to_remote_browser(
+                "https://boards.greenhouse.io/acme/jobs/1", self.job,
+                self.profile, "resume text", "/tmp/resume.pdf", "/tmp/cover.pdf",
+                self.log)
+
+        self.assertTrue(result)
+        mock_fill.assert_called_once()
+        mock_wa.assert_called_once()
+        mock_email.assert_called_once()
+        # Never submits — only fills. The submit button is the human's job.
+        fake_page.click.assert_not_called()
+        # scp'd both files up (2) and always attempts the rm cleanup (1) —
+        # the resume/cover letter must never be left sitting on the VPS.
+        run_calls = list(mock_run.call_args_list)
+        rm_calls = [c for c in run_calls if "rm" in c.args[0]]
+        self.assertEqual(len(rm_calls), 1)
+
+    def test_cleanup_runs_even_when_remote_fill_raises(self):
+        env = {"VPS_HOST": "40.160.138.169", "VPS_SSH_KEY_PATH": "/tmp/fake_key"}
+
+        fake_pw_module = MagicMock()
+        fake_pw_module.sync_playwright = MagicMock(side_effect=RuntimeError("cdp connect failed"))
+        with patch.dict(os.environ, env, clear=True), \
+             patch.dict(sys.modules, {"playwright.sync_api": fake_pw_module}), \
+             patch("subprocess.run") as mock_run, \
+             patch("auto_apply.os.path.exists", return_value=True):
+            mock_run.return_value = MagicMock(returncode=0)
+            result = aa.escalate_to_remote_browser(
+                "https://boards.greenhouse.io/acme/jobs/1", self.job,
+                self.profile, "resume text", "/tmp/resume.pdf", "/tmp/cover.pdf",
+                self.log)
+
+        self.assertFalse(result)
+        run_calls = mock_run.call_args_list
+        rm_calls = [c for c in run_calls if "rm" in c.args[0]]
+        self.assertEqual(len(rm_calls), 1)
 
 
 if __name__ == "__main__":
