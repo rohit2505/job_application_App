@@ -50,6 +50,11 @@ env:
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    env:
+      # Job-level env so `if:` conditions below can check it — GitHub
+      # Actions doesn't allow the `secrets` context directly inside an
+      # `if:` expression, only inside `env:`/`run:` blocks.
+      VPS_HOST: ${{ secrets.VPS_HOST }}
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -123,7 +128,7 @@ jobs:
             --regenerate
 
       - name: Set up VPS SSH key (for the CAPTCHA remote-browser hand-off)
-        if: ${{ secrets.VPS_HOST != '' }}
+        if: ${{ env.VPS_HOST != '' }}
         run: |
           mkdir -p ~/.ssh
           cat > ~/.ssh/vps_key <<'EOF'
@@ -133,7 +138,7 @@ jobs:
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Open SSH tunnel to the VPS browser's CDP port
-        if: ${{ secrets.VPS_HOST != '' }}
+        if: ${{ env.VPS_HOST != '' }}
         run: |
           # Backgrounded (-f) and never dies with this step — stays open for
           # the rest of the job so Stage 4 can reach the VPS's Chromium at
