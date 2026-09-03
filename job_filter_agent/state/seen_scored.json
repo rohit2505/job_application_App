@@ -1,1 +1,25 @@
-{}
+{
+"https://boards.greenhouse.io/octave/jobs/8770612002?gh_jid=8770612002": {
+"drop": "no_sponsor"
+},
+"https://job-boards.greenhouse.io/cipherhealth/jobs/8175700": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobs.ashbyhq.com/hims-and-hers/a321e167-59ab-46cc-9b50-75154f122bdb": {
+"employer_type": "direct",
+"score": 88
+},
+"https://jobs.ashbyhq.com/infinity-constellation/8dd8dc6b-a82d-4802-87b0-206bcfb2bf87": {
+"employer_type": "direct",
+"score": 92
+},
+"https://nexaminds.ai/careers?gh_jid=5229405007": {
+"employer_type": "direct",
+"score": 88
+},
+"https://nexaminds.ai/careers?gh_jid=5229410007": {
+"employer_type": "unknown",
+"score": 82
+}
+}
