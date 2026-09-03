@@ -335,6 +335,22 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
     remote_cover = _scp_to_vps(cover_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
     uploaded_remote_paths = [p for p in (remote_resume, remote_cover) if p]
 
+    # If either scp failed, resume_path/cover_path are LOCAL to the CI
+    # runner and don't exist on the VPS the browser actually runs on --
+    # falling back to them silently would hand set_input_files() a path
+    # that can't possibly attach anything there. Fail closed instead of
+    # producing a filled-looking form with no resume attached.
+    if resume_path and not remote_resume:
+        print(f"  [vps-escalate] resume scp to VPS failed — aborting rather than "
+              f"filling with an unreachable local path", file=sys.stderr)
+        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
+        return False
+    if cover_path and os.path.exists(cover_path) and not remote_cover:
+        print(f"  [vps-escalate] cover letter scp to VPS failed — aborting rather than "
+              f"filling with an unreachable local path", file=sys.stderr)
+        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
+        return False
+
     def _fill_on_playwright(p):
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
         context = browser.contexts[0] if browser.contexts else browser.new_context()
@@ -346,18 +362,31 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         gframe = find_greenhouse_frame_with_retry(rpage)
         if gframe:
             fill_greenhouse_form(gframe, job, profile, resume_text,
-                                  remote_resume or resume_path,
-                                  remote_cover or cover_path, log)
-            filled = True
+                                  remote_resume, remote_cover, log)
             filled_frame = gframe
         else:
             lframe = find_lever_form(rpage)
             if lframe:
                 fill_lever_form(lframe, job, profile, resume_text,
-                                 remote_resume or resume_path,
-                                 remote_cover or cover_path, log)
-                filled = True
+                                 remote_resume, remote_cover, log)
                 filled_frame = lframe
+
+        # Never hand off a form that looks filled but silently isn't --
+        # same guard the normal (non-escalated) flow applies before
+        # submitting, ported here since this path has no submit step of
+        # its own to catch it. Without this, an internal fill_greenhouse_
+        # form/fill_lever_form failure (bad selector, page not fully
+        # loaded yet, etc.) would still report "escalated_remote" success
+        # with a blank form waiting on the VPS.
+        if filled_frame is not None:
+            if _required_fields_actually_filled(filled_frame, profile):
+                filled = True
+            else:
+                log.append({"error": "required fields (first/last name, email) did not "
+                                      "verify as filled on the remote browser -- not "
+                                      "treating this as a successful hand-off"})
+                print("  [vps-escalate] required fields did not verify as filled after "
+                      "remote fill — treating as failed, not notifying", file=sys.stderr)
         # Deliberately no submit here — a human finishes this from
         # the noVNC link below (captcha + final click are theirs).
 
