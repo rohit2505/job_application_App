@@ -317,38 +317,23 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         print(f"  [vps-escalate] playwright unavailable: {e}", file=sys.stderr)
         return False
 
-    # Make sure the upload dir exists on the VPS, then copy the resume/
-    # cover letter over — the remote Chromium needs these files local to
-    # its own machine to attach them, not just reachable from the CI runner.
-    import subprocess
-    try:
-        subprocess.run(
-            ["ssh", "-i", ssh_key, "-p", str(ssh_port), "-o", "StrictHostKeyChecking=no",
-             "-o", "ConnectTimeout=15", f"{ssh_user}@{vps_host}", "mkdir", "-p", remote_dir],
-            timeout=20, check=True, capture_output=True,
-        )
-    except Exception as e:
-        print(f"  [vps-escalate] could not prep remote upload dir: {e}", file=sys.stderr)
-        return False
-
-    remote_resume = _scp_to_vps(resume_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
-    remote_cover = _scp_to_vps(cover_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
-    uploaded_remote_paths = [p for p in (remote_resume, remote_cover) if p]
-
-    # If either scp failed, resume_path/cover_path are LOCAL to the CI
-    # runner and don't exist on the VPS the browser actually runs on --
-    # falling back to them silently would hand set_input_files() a path
-    # that can't possibly attach anything there. Fail closed instead of
-    # producing a filled-looking form with no resume attached.
+    # NOTE: resume_path/cover_path are used AS-IS, with no scp to the VPS.
+    # Playwright's set_input_files() reads the file on the machine running
+    # the Playwright *client* (this Python process) and streams its bytes
+    # over the CDP connection -- it does NOT need the file to exist on
+    # whatever machine the browser itself is running on. An earlier version
+    # of this function scp'd the resume/cover letter to the VPS first and
+    # passed that VPS-only path to set_input_files(), which raised a local
+    # FileNotFoundError every time in reality (confirmed live: "No such
+    # file or directory: '/home/ubuntu/uploads/resume.docx'" -- a path that
+    # can only ever exist on the VPS, being looked up on the CLIENT
+    # machine). That's been the real cause of every "resume not attached"
+    # report in this feature, independent of any frame/selector issue.
+    remote_resume = resume_path if resume_path and os.path.exists(resume_path) else None
+    remote_cover = cover_path if cover_path and os.path.exists(cover_path) else None
     if resume_path and not remote_resume:
-        print(f"  [vps-escalate] resume scp to VPS failed — aborting rather than "
-              f"filling with an unreachable local path", file=sys.stderr)
-        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
-        return False
-    if cover_path and os.path.exists(cover_path) and not remote_cover:
-        print(f"  [vps-escalate] cover letter scp to VPS failed — aborting rather than "
-              f"filling with an unreachable local path", file=sys.stderr)
-        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
+        print(f"  [vps-escalate] resume path does not exist locally ({resume_path}) — "
+              f"aborting rather than filling with a bad path", file=sys.stderr)
         return False
 
     def _fill_on_playwright(p):
@@ -481,9 +466,7 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         print(f"  [vps-escalate] remote fill failed: {e}", file=sys.stderr)
         log.append({"vps_escalate_error": str(e)})
     finally:
-        # Best-effort cleanup regardless of outcome — never leave the
-        # resume/cover letter sitting on the VPS.
-        _ssh_rm_on_vps(uploaded_remote_paths, ssh_key, ssh_user, vps_host, ssh_port)
+        pass  # nothing uploaded to the VPS any more -- nothing to clean up
 
     if not filled_ok:
         return False

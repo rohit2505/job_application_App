@@ -835,11 +835,11 @@ class RemoteEscalationTests(unittest.TestCase):
         mock_email.assert_called_once()
         # Never submits — only fills. The submit button is the human's job.
         fake_page.click.assert_not_called()
-        # scp'd both files up (2) and always attempts the rm cleanup (1) —
-        # the resume/cover letter must never be left sitting on the VPS.
-        run_calls = list(mock_run.call_args_list)
-        rm_calls = [c for c in run_calls if "rm" in c.args[0]]
-        self.assertEqual(len(rm_calls), 1)
+        # No scp/ssh calls at all any more -- resume_path/cover_path are
+        # used directly, since Playwright's set_input_files() reads the
+        # file on the client machine (this process) and streams it over
+        # CDP, regardless of where the browser itself is running.
+        mock_run.assert_not_called()
 
     def test_resume_actually_attached_true_when_files_present(self):
         fake_input = MagicMock()
@@ -893,9 +893,8 @@ class RemoteEscalationTests(unittest.TestCase):
                 self.log)
 
         self.assertFalse(result)
-        run_calls = mock_run.call_args_list
-        rm_calls = [c for c in run_calls if "rm" in c.args[0]]
-        self.assertEqual(len(rm_calls), 1)
+        # No scp/ssh calls at all any more -- see comment above.
+        mock_run.assert_not_called()
 
 
 if __name__ == "__main__":
