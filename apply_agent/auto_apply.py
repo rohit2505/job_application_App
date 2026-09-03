@@ -354,8 +354,27 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
     def _fill_on_playwright(p):
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
         context = browser.contexts[0] if browser.contexts else browser.new_context()
+
+        # Best-effort: close any leftover tabs from a previous escalation run
+        # (e.g. an old unsubmitted form) so the VPS browser window does not
+        # have multiple tabs competing for what noVNC actually shows.
+        for old_page in list(context.pages):
+            try:
+                old_page.close()
+            except Exception:
+                pass
+
         rpage = context.new_page()
+        # connect_over_cdp's new_page() opens the tab but does NOT switch the
+        # real Chromium window's focus to it -- noVNC just mirrors whatever
+        # tab is visually on top, so without this the human opening the
+        # live-view link sees whatever tab happened to be focused before
+        # (often blank/stale), not the one actually being filled. This is
+        # what caused "form filled but blank on VNC" even though the fill
+        # itself succeeded.
+        rpage.bring_to_front()
         rpage.goto(url, timeout=45000)
+        rpage.bring_to_front()
 
         filled = False
         filled_frame = None
