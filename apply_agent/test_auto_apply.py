@@ -819,6 +819,7 @@ class RemoteEscalationTests(unittest.TestCase):
              patch("auto_apply.os.path.exists", return_value=True), \
              patch("auto_apply.find_greenhouse_frame_with_retry", return_value=fake_frame), \
              patch("auto_apply.fill_greenhouse_form") as mock_fill, \
+             patch("auto_apply._resume_field_exists", return_value=True), \
              patch("auto_apply._resume_actually_attached", return_value=True), \
              patch("auto_apply.send_whatsapp", return_value=(True, "ok", "1")) as mock_wa, \
              patch("auto_apply.send_email", return_value=True) as mock_email:

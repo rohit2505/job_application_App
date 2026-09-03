@@ -386,16 +386,41 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         filled = False
         filled_frame = None
         gframe = find_greenhouse_frame_with_retry(rpage)
-        if gframe:
-            fill_greenhouse_form(gframe, job, profile, resume_text,
-                                  remote_resume, remote_cover, log)
-            filled_frame = gframe
-        else:
-            lframe = find_lever_form(rpage)
-            if lframe:
-                fill_lever_form(lframe, job, profile, resume_text,
+        candidate_frame = gframe
+        is_lever = False
+        if not gframe:
+            candidate_frame = find_lever_form(rpage)
+            is_lever = candidate_frame is not None
+
+        # Refuse to fill a frame that doesn't actually have a resume upload
+        # field, when we have a resume to upload. Hit live on a job whose
+        # "career page" was a custom-branded site with its own non-standard
+        # apply flow (no real embedded Greenhouse/Lever form, no <input
+        # type=file> anywhere reachable) -- the old code still matched some
+        # unrelated first_name/email fields elsewhere on the page, filled
+        # those, and reported escalated_remote success with nothing actually
+        # attached. Checking for the resume field FIRST means a page like
+        # that fails closed instead of silently lying about success.
+        if candidate_frame is not None and remote_resume:
+            if not _resume_field_exists(candidate_frame):
+                log.append({"error": "matched frame has no resume file input "
+                                      "(#resume / input[name='resume']) -- this "
+                                      "does not look like a real, fillable "
+                                      "Greenhouse/Lever form; refusing to fill "
+                                      "unrelated fields and report false success"})
+                print("  [vps-escalate] no resume file input found on matched frame — "
+                      "treating as not a real fillable form, not attempting fill",
+                      file=sys.stderr)
+                candidate_frame = None
+
+        if candidate_frame is not None:
+            if is_lever:
+                fill_lever_form(candidate_frame, job, profile, resume_text,
                                  remote_resume, remote_cover, log)
-                filled_frame = lframe
+            else:
+                fill_greenhouse_form(candidate_frame, job, profile, resume_text,
+                                      remote_resume, remote_cover, log)
+            filled_frame = candidate_frame
 
         # Never hand off a form that looks filled but silently isn't --
         # same guard the normal (non-escalated) flow applies before
@@ -1144,6 +1169,20 @@ def _required_fields_actually_filled(frame, profile):
         if not got:
             return False
     return True
+
+
+def _resume_field_exists(frame):
+    """Does a resume file input exist on this frame at all? Checked BEFORE
+    filling, so a frame with no real resume field (a custom/non-standard
+    apply flow, or the wrong frame matched entirely) is refused up front
+    instead of being filled with unrelated fields and reported as success."""
+    for selector in ("#resume", "input[name='resume']"):
+        try:
+            if frame.locator(selector).first.count():
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _resume_actually_attached(frame):
