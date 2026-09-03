@@ -355,14 +355,12 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
         context = browser.contexts[0] if browser.contexts else browser.new_context()
 
-        # Best-effort: close any leftover tabs from a previous escalation run
-        # (e.g. an old unsubmitted form) so the VPS browser window does not
-        # have multiple tabs competing for what noVNC actually shows.
-        for old_page in list(context.pages):
-            try:
-                old_page.close()
-            except Exception:
-                pass
+        # Remember which tabs existed before we open our own, so we can
+        # clean them up AFTER -- never before. Closing the last remaining
+        # tab in a window can close the whole browser context/window along
+        # with it (hit live: "BrowserContext.new_page: Target page, context
+        # or browser has been closed"), so the new tab must exist first.
+        stale_pages = list(context.pages)
 
         rpage = context.new_page()
         # connect_over_cdp's new_page() opens the tab but does NOT switch the
@@ -375,6 +373,15 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         rpage.bring_to_front()
         rpage.goto(url, timeout=45000)
         rpage.bring_to_front()
+
+        # Now safe to close leftovers from a previous escalation run (e.g.
+        # an old unsubmitted form) -- our own tab already exists, so the
+        # window/context can't be closed out from under us.
+        for old_page in stale_pages:
+            try:
+                old_page.close()
+            except Exception:
+                pass
 
         filled = False
         filled_frame = None
