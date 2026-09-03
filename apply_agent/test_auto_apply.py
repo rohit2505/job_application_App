@@ -819,6 +819,7 @@ class RemoteEscalationTests(unittest.TestCase):
              patch("auto_apply.os.path.exists", return_value=True), \
              patch("auto_apply.find_greenhouse_frame_with_retry", return_value=fake_frame), \
              patch("auto_apply.fill_greenhouse_form") as mock_fill, \
+             patch("auto_apply._resume_actually_attached", return_value=True), \
              patch("auto_apply.send_whatsapp", return_value=(True, "ok", "1")) as mock_wa, \
              patch("auto_apply.send_email", return_value=True) as mock_email:
             mock_run.return_value = MagicMock(returncode=0)
@@ -838,6 +839,42 @@ class RemoteEscalationTests(unittest.TestCase):
         run_calls = list(mock_run.call_args_list)
         rm_calls = [c for c in run_calls if "rm" in c.args[0]]
         self.assertEqual(len(rm_calls), 1)
+
+    def test_resume_actually_attached_true_when_files_present(self):
+        fake_input = MagicMock()
+        fake_input.count.return_value = 1
+        fake_input.evaluate.return_value = 1
+        fake_frame = MagicMock()
+        fake_frame.locator.return_value.first = fake_input
+        self.assertTrue(aa._resume_actually_attached(fake_frame))
+
+    def test_resume_actually_attached_false_when_no_files(self):
+        fake_input = MagicMock()
+        fake_input.count.return_value = 1
+        fake_input.evaluate.return_value = 0
+        fake_frame = MagicMock()
+        fake_frame.locator.return_value.first = fake_input
+        self.assertFalse(aa._resume_actually_attached(fake_frame))
+
+    def test_resume_upload_not_skipped_for_remote_only_path(self):
+        # Regression test for the actual bug reported live: fill_greenhouse_form
+        # used to check os.path.exists(path) before uploading, but when called
+        # from escalate_to_remote_browser() `path` is a file that exists on the
+        # VPS (the machine running the browser), not on whatever machine is
+        # running this Python process -- so the local check always silently
+        # evaluated False and skipped the upload with no error at all. The fix
+        # is to never check local existence for a remote path; verify the
+        # upload is still attempted (set_input_files called) even though
+        # os.path.exists() on THIS machine would say the file doesn't exist.
+        fake_resume_input = MagicMock()
+        fake_resume_input.count.return_value = 1
+        fake_frame = MagicMock()
+        fake_frame.locator.return_value.first = fake_resume_input
+        remote_only_path = "/home/ubuntu/uploads/resume.pdf"  # never exists locally
+        self.assertFalse(os.path.exists(remote_only_path))
+        aa.fill_greenhouse_form(fake_frame, self.job, self.profile, "",
+                                 remote_only_path, None, self.log)
+        fake_resume_input.set_input_files.assert_called_once_with(remote_only_path)
 
     def test_cleanup_runs_even_when_remote_fill_raises(self):
         env = {"VPS_HOST": "40.160.138.169", "VPS_SSH_KEY_PATH": "/tmp/fake_key"}

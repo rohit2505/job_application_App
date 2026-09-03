@@ -405,14 +405,22 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         # loaded yet, etc.) would still report "escalated_remote" success
         # with a blank form waiting on the VPS.
         if filled_frame is not None:
-            if _required_fields_actually_filled(filled_frame, profile):
+            fields_ok = _required_fields_actually_filled(filled_frame, profile)
+            # Only require the resume to have actually attached if we tried
+            # to attach one in the first place.
+            resume_ok = (not remote_resume) or _resume_actually_attached(filled_frame)
+            if fields_ok and resume_ok:
                 filled = True
             else:
-                log.append({"error": "required fields (first/last name, email) did not "
-                                      "verify as filled on the remote browser -- not "
-                                      "treating this as a successful hand-off"})
-                print("  [vps-escalate] required fields did not verify as filled after "
-                      "remote fill — treating as failed, not notifying", file=sys.stderr)
+                reasons = []
+                if not fields_ok:
+                    reasons.append("required fields (first/last name, email) did not verify as filled")
+                if not resume_ok:
+                    reasons.append("resume file input did not verify as attached")
+                log.append({"error": " and ".join(reasons) + " on the remote browser -- "
+                                      "not treating this as a successful hand-off"})
+                print(f"  [vps-escalate] {' and '.join(reasons)} after remote fill — "
+                      f"treating as failed, not notifying", file=sys.stderr)
         # Deliberately no submit here — a human finishes this from
         # the noVNC link below (captcha + final click are theirs).
 
@@ -1000,18 +1008,29 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
     loc = ", ".join(x for x in (profile.get("location_city"), profile.get("location_state")) if x)
     try_fill("candidate-location", "candidate-location", loc)
 
-    # Resume / cover letter uploads
+    # Resume / cover letter uploads. Deliberately NOT checking
+    # os.path.exists(path) here -- when this runs against a remote browser
+    # (escalate_to_remote_browser), `path` is a file on THAT machine (the
+    # VPS), not on whatever machine is running this Python process, so a
+    # local existence check would always silently fail and skip the
+    # upload with no error. set_input_files() checks existence on the
+    # correct (browser-side) machine itself.
     for field_id, path in (("resume", resume_path), ("cover_letter", cover_path)):
-        if not path or not os.path.exists(path):
+        if not path:
             continue
+        uploaded = False
         for selector in (f"#{field_id}", f"input[name='{field_id}']"):
             try:
                 el = frame.locator(selector).first
                 if el.count():
                     el.set_input_files(path)
+                    uploaded = True
                     break
-            except Exception:
-                continue
+            except Exception as e:
+                log.append({"error": f"failed to attach {field_id} ({path}): {e}"})
+        if not uploaded:
+            log.append({"error": f"no matching file input found for {field_id} "
+                                  f"(#{field_id} / input[name='{field_id}'])"})
 
     # Label-keyword-matched text fields (LinkedIn, website, how-did-you-hear, etc.)
     # — Greenhouse's custom questions are input#question_<num> with empty
@@ -1127,6 +1146,24 @@ def _required_fields_actually_filled(frame, profile):
     return True
 
 
+def _resume_actually_attached(frame):
+    """Verify the resume file input really holds a file, checked via the
+    DOM's own File API (files.length) rather than trusting that
+    set_input_files() not raising means it landed on the right element.
+    Tries both the Greenhouse-style #resume/input[name='resume'] and the
+    same name-based selector Lever uses."""
+    for selector in ("#resume", "input[name='resume']"):
+        try:
+            el = frame.locator(selector).first
+            if el.count():
+                count = el.evaluate("el => el.files ? el.files.length : 0")
+                if count and count > 0:
+                    return True
+        except Exception:
+            continue
+    return False
+
+
 def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, log):
     """Fills Lever's standard application form — verified live against a
     real Lever posting (jobs.lever.co). Field names are fixed/standard
@@ -1163,14 +1200,17 @@ def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, l
     try_fill("input[name='urls[Portfolio]']", profile.get("portfolio_url"))
 
     for name, path in (("resume", resume_path),):
-        if not path or not os.path.exists(path):
+        if not path:
             continue
         try:
             el = frame.locator(f"input[name='{name}']").first
             if el.count():
                 el.set_input_files(path)
-        except Exception:
-            pass
+            else:
+                log.append({"error": f"no matching file input found for {name} "
+                                      f"(input[name='{name}'])"})
+        except Exception as e:
+            log.append({"error": f"failed to attach {name} ({path}): {e}"})
 
     # Custom per-posting questions: Lever groups these as
     # cards[<uuid>][field0] (radio options) or cards[<uuid>][field1]
