@@ -223,6 +223,16 @@ def send_email(subject, text_body, attach_paths=None):
         return False
 
 
+# Set by main() while its own `with sync_playwright() as p:` session is
+# open, so escalate_to_remote_browser() below can reuse that same instance
+# instead of opening a second, nested sync_playwright() context in the same
+# thread -- Playwright's sync API does not support that and raises "It
+# looks like you are using Playwright Sync API inside the asyncio loop"
+# (hit live in CI, 2026-09). None when called standalone (e.g. the manual
+# test script), in which case escalate_to_remote_browser() opens its own.
+_ACTIVE_PLAYWRIGHT = None
+
+
 # --------------------------------------------------------------------------- #
 # Remote-browser escalation — when a CAPTCHA blocks an otherwise-fillable
 # Greenhouse/Lever form, hand the (already-filled) form off to a browser
@@ -292,6 +302,11 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
     cdp_port = int(cfg("VPS_CDP_LOCAL_PORT") or 9222)  # local end of the already-open tunnel
     remote_dir = cfg("VPS_REMOTE_UPLOAD_DIR") or "/home/ubuntu/uploads"
     novnc_url = cfg("VPS_NOVNC_URL") or f"http://{vps_host}:6080/vnc.html"
+    # resize=scale: noVNC scales the whole remote desktop down to fit
+    # whatever screen opens the link, so a phone doesn't need horizontal/
+    # vertical panning just to see the page — pinch-zoom still works for
+    # precise taps.
+    novnc_url += ("&" if "?" in novnc_url else "?") + "resize=scale"
     novnc_password = cfg("VPS_NOVNC_PASSWORD") or ""
 
     title, company = job.get("title", ""), job.get("company", "")
@@ -320,29 +335,60 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
     remote_cover = _scp_to_vps(cover_path, remote_dir, ssh_key, ssh_user, vps_host, ssh_port)
     uploaded_remote_paths = [p for p in (remote_resume, remote_cover) if p]
 
+    def _fill_on_playwright(p):
+        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
+        context = browser.contexts[0] if browser.contexts else browser.new_context()
+        rpage = context.new_page()
+        rpage.goto(url, timeout=45000)
+
+        filled = False
+        filled_frame = None
+        gframe = find_greenhouse_frame_with_retry(rpage)
+        if gframe:
+            fill_greenhouse_form(gframe, job, profile, resume_text,
+                                  remote_resume or resume_path,
+                                  remote_cover or cover_path, log)
+            filled = True
+            filled_frame = gframe
+        else:
+            lframe = find_lever_form(rpage)
+            if lframe:
+                fill_lever_form(lframe, job, profile, resume_text,
+                                 remote_resume or resume_path,
+                                 remote_cover or cover_path, log)
+                filled = True
+                filled_frame = lframe
+        # Deliberately no submit here — a human finishes this from
+        # the noVNC link below (captcha + final click are theirs).
+
+        # Scroll straight to the captcha (or, failing that, the bottom
+        # of the form) so opening the noVNC link on a phone lands right
+        # on the thing you need to act on, instead of a long form you'd
+        # otherwise have to hunt/scroll through on a small screen.
+        if filled_frame is not None:
+            try:
+                captcha_el = filled_frame.locator(
+                    "iframe[src*='recaptcha'], .g-recaptcha, [name='g-recaptcha-response'], "
+                    "iframe[src*='hcaptcha'], .h-captcha, [name='h-captcha-response']"
+                ).first
+                if captcha_el.count():
+                    captcha_el.scroll_into_view_if_needed(timeout=5000)
+                else:
+                    rpage.keyboard.press("End")
+            except Exception as e:
+                print(f"  [vps-escalate] scroll-to-captcha failed (non-fatal): {e}", file=sys.stderr)
+        return filled
+
     filled_ok = False
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
-            context = browser.contexts[0] if browser.contexts else browser.new_context()
-            rpage = context.new_page()
-            rpage.goto(url, timeout=45000)
-
-            gframe = find_greenhouse_frame_with_retry(rpage)
-            if gframe:
-                fill_greenhouse_form(gframe, job, profile, resume_text,
-                                      remote_resume or resume_path,
-                                      remote_cover or cover_path, log)
-                filled_ok = True
-            else:
-                lframe = find_lever_form(rpage)
-                if lframe:
-                    fill_lever_form(lframe, job, profile, resume_text,
-                                     remote_resume or resume_path,
-                                     remote_cover or cover_path, log)
-                    filled_ok = True
-            # Deliberately no submit here — a human finishes this from
-            # the noVNC link below (captcha + final click are theirs).
+        if _ACTIVE_PLAYWRIGHT is not None:
+            # Reuse the caller's already-open Playwright session (see the
+            # _ACTIVE_PLAYWRIGHT comment above) instead of nesting a second
+            # sync_playwright() context in the same thread.
+            filled_ok = _fill_on_playwright(_ACTIVE_PLAYWRIGHT)
+        else:
+            with sync_playwright() as p:
+                filled_ok = _fill_on_playwright(p)
     except Exception as e:
         print(f"  [vps-escalate] remote fill failed: {e}", file=sys.stderr)
         log.append({"vps_escalate_error": str(e)})
@@ -1483,6 +1529,8 @@ def main():
     applied, skipped = 0, 0
 
     with sync_playwright() as p:
+        global _ACTIVE_PLAYWRIGHT
+        _ACTIVE_PLAYWRIGHT = p
         browser = p.chromium.launch(headless=args.headless)
         for j in jobs:
             jid = (j.get("url") or f"{j.get('company')}:{j.get('title')}").strip()
@@ -1589,6 +1637,7 @@ def main():
                 # Leave this job for the existing email-me-the-link flow
                 # (apply_notifier.py) — nothing else to do here.
         browser.close()
+    _ACTIVE_PLAYWRIGHT = None
 
     save_seen(args.seen_file, seen)
     save_seen(args.success_file, success)

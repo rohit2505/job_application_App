@@ -13,3 +13,4 @@ job_filter_agent/scored.json
 # you about the same job twice.
 job_filter_agent/github_token.txt
 .DS_Store
+apply_agent/manual_test_vps_escalation.py
