@@ -430,6 +430,39 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                     remote_resume, remote_cover, log)
             filled_frame = candidate_frame
 
+        # Escalate any unanswered screening question to Telegram, same as
+        # the normal (non-escalated) flow's _finish_application already
+        # does -- this was previously ONLY wired up for that path, so a
+        # CAPTCHA job that also had a question Claude couldn't answer from
+        # your resume/profile would just sit there with that field blank
+        # and nobody would know until you opened the VNC link yourself.
+        # Do this BEFORE the captcha/submit hand-off notification below,
+        # so by the time you get the "come finish this" message the
+        # question is already answered and you only need to solve the
+        # captcha and click submit.
+        if filled_frame is not None:
+            unanswered = [q for q in log if q.get("source") == "unanswered"]
+            for item in unanswered:
+                asked_at = time.time()
+                sent, _detail, _msg_id = send_whatsapp(
+                    f"🧑‍💻 Stuck on {job.get('company','')} application "
+                    f"(filled remotely, waiting on a CAPTCHA too):\n"
+                    f"\"{item['question']}\"\nReply with your answer.")
+                if not sent:
+                    continue  # can't ask -- leave it unanswered, don't block the hand-off
+                reply = wait_for_whatsapp_reply(asked_at)
+                if not reply:
+                    continue  # no reply in time -- leave it unanswered, don't block the hand-off
+                final_answer, source_tag = resolve_telegram_reply(
+                    reply, item["question"], resume_text, profile)
+                item["answer"], item["source"] = final_answer, source_tag
+                try:
+                    el = filled_frame.get_by_label(item["question"]).first
+                    if el.count():
+                        el.fill(final_answer)
+                except Exception:
+                    pass
+
         # Never hand off a form that looks filled but silently isn't --
         # same guard the normal (non-escalated) flow applies before
         # submitting, ported here since this path has no submit step of
