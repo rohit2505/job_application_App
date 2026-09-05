@@ -850,7 +850,17 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
         print("  [activejobsdb_apify] skipped — set APIFY_TOKEN")
         return []
     time_frame = "24h" if window_min <= 1440 else ("7d" if window_min <= 10080 else "6m")
-    limit = 15  # keep runs cheap by default — override by editing this call site
+    # Was hardcoded to 15 -- with only ~1 in 4 postings in this dataset
+    # actually tagged remote (Remote OK / Remote Solely; see
+    # activejobsdb_sample.json), and every result also needing to clear
+    # REMOTE_ONLY, MIN_SALARY, the greenhouse/lever/ashby ATS filter, title
+    # match, and not-already-in-seen.json dedup on top of that, 15 raw rows
+    # per query starved almost every one of those downstream filters --
+    # this was very likely why real runs kept reporting "no new jobs found"
+    # even though the classification logic itself was fine. Configurable via
+    # APIFY_JOB_LIMIT (cost is ~$0.012/job + ~$0.01/run, so 100 is still
+    # well under $1.50/run for a single query).
+    limit = int(cfg("APIFY_JOB_LIMIT") or 100)
     ats_filter = ats if ats is not None else ["greenhouse", "lever.co", "ashby"]
     payload = {
         "timeRange": time_frame,
@@ -877,6 +887,12 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
         mapped = _map_active_jobs_db_row(j, now, window_min, source_tag="activejobsdb_apify")
         if mapped:
             out.append(mapped)
+    # Visibility for next time this looks starved: how many of the raw rows
+    # pulled were even tagged remote, before REMOTE_ONLY/salary/dedup get a
+    # chance to filter further.
+    remote_count = sum(1 for j in out if j.get("remote"))
+    print(f"  [activejobsdb_apify] pulled {len(rows)} raw row(s), "
+          f"{len(out)} in window, {remote_count} tagged remote")
     return out
 
 
