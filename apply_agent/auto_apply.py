@@ -1415,6 +1415,38 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
 
+    # DIAGNOSTIC ONLY -- no fill behavior change. Caught live on Pie
+    # Insurance's job-boards.greenhouse.io posting: a REQUIRED question
+    # ("years of hands-on Snowflake administration experience") rendered
+    # as a "Select..." placeholder widget that none of our <select>/
+    # checkbox/text-input passes could see at all -- it isn't a native
+    # <select>, so it's very likely a custom JS combobox (react-select-
+    # style) used by this newer Greenhouse template. This dumps the real
+    # markup for any such widget so the actual detect-and-fill logic can
+    # be built against real structure instead of guessing at class names.
+    # Safe to leave in permanently: read-only, and does nothing if none
+    # of these widgets exist on a given page.
+    try:
+        placeholder_widgets = frame.get_by_text("Select...", exact=True)
+        pw_count = placeholder_widgets.count()
+        print(f"  [diag] found {pw_count} 'Select...' placeholder widget(s) "
+              f"on this page (not native <select> -- these are currently "
+              f"invisible to every fill pass)", file=sys.stderr)
+        for i in range(min(pw_count, 10)):
+            try:
+                el = placeholder_widgets.nth(i)
+                container = el.locator(
+                    "xpath=ancestor::*[self::div or self::fieldset][2]").first
+                html = (container.evaluate("el => el.outerHTML")
+                        if container.count()
+                        else el.evaluate("el => el.outerHTML"))
+                print(f"  [diag] widget[{i}] outerHTML (truncated to 2000 "
+                      f"chars): {html[:2000]}", file=sys.stderr)
+            except Exception as e:
+                print(f"  [diag] widget[{i}] inspect failed: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [diag] custom-dropdown scan error: {e}", file=sys.stderr)
+
     # <select> dropdown questions -- visa/work-authorization status,
     # how-did-you-hear-about-us, EEO gender/race/veteran/disability, etc.
     # Previously not handled at all: only input[type=text] and
