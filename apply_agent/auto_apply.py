@@ -314,7 +314,7 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
               "VPS browser/VNC session", file=sys.stderr)
         log.append({"error": "VPS already has one CAPTCHA job filled and waiting this "
                               "run — not escalating a second one on top of it"})
-        return False
+        return None  # None = deferred (retry-eligible), NOT the same as False
 
     ssh_key = cfg("VPS_SSH_KEY_PATH") or os.path.expanduser("~/.ssh/vps_key")
     ssh_user = cfg("VPS_SSH_USER") or "ubuntu"
@@ -1575,8 +1575,11 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
                 pass
 
     if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
-        if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+        escalated = escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log)
+        if escalated:
             return "escalated_remote", log, None
+        if escalated is None:
+            return "captcha_deferred", log, None
         return "captcha", log, None
 
     # Never submit unless the required fields genuinely took a value — this
@@ -1776,8 +1779,11 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
     frame = find_greenhouse_frame_with_retry(page)
     if frame:
         if _captcha_present_with_retry(page, frame):
-            if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+            escalated = escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log)
+            if escalated:
                 return "escalated_remote", log, None
+            if escalated is None:
+                return "captcha_deferred", log, None
             return "captcha", log, None
         fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log)
@@ -1785,8 +1791,11 @@ def _apply_to_resolved_page(page, rstatus, job, profile, resume_text, resume_pat
     lever_frame = find_lever_form(page)
     if lever_frame:
         if _captcha_present_with_retry(page, lever_frame):
-            if escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log):
+            escalated = escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log)
+            if escalated:
                 return "escalated_remote", log, None
+            if escalated is None:
+                return "captcha_deferred", log, None
             return "captcha", log, None
         fill_lever_form(lever_frame, job, profile, resume_text, resume_path, cover_path, log)
         return _finish_application(page, lever_frame, job, profile, resume_text, resume_path, cover_path, log)
@@ -1965,6 +1974,8 @@ def main():
                                           "there afterward — likely rejected client-side, "
                                           "not confirmed as a real submission",
                     "captcha": "CAPTCHA present — will not auto-submit",
+                    "captcha_deferred": "CAPTCHA present, but a different job already used "
+                                        "this run's one VPS hand-off — retryable next run",
                     "unanswered": "a screening question couldn't be answered "
                                   "(Claude was unsure, and Telegram reply didn't "
                                   "arrive in time / not configured)",

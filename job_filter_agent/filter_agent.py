@@ -516,12 +516,34 @@ def main():
             seen[k] = {"drop": f"employer_type:{etype}", "score": score}
             dropped_staff += 1
             continue
-        seen[k] = {"score": score, "employer_type": etype}
         if score >= args.min_score:
+            # Deliberately NOT added to `seen` -- a job that clears the score
+            # threshold gets handed to auto_apply.py, which has its own,
+            # more accurate dedup (state/applied.json) based on the REAL
+            # outcome of actually attempting it (applied, escalated_remote,
+            # not_greenhouse, stale_listing are permanent there; captcha_
+            # deferred, fill_failed, redirect_failed, unanswered etc. are
+            # retry-eligible). Marking it seen here too, permanently, the
+            # moment it merely scores >=70 was blacklisting every job that
+            # scored well but never actually got applied (CAPTCHA, an
+            # unsupported ATS discovered only once VPS escalation was
+            # already used elsewhere this run, a transient fill failure...)
+            # from ever being reconsidered by ANY future run -- this was
+            # very likely why real runs kept finding "0 new jobs": the
+            # first run to see a job would score it, it'd fail to actually
+            # apply for a retryable reason, and it would just vanish from
+            # scored.json forever afterward. The (small) cost is re-scoring
+            # the same still-open job with one extra Claude call per run
+            # until it's genuinely resolved -- worth it to not silently
+            # drop real candidates.
             jj = dict(j)
             jj["score"], jj["reason"], jj["employer_type"] = score, reason, etype
             jj["remote_signal"] = remote_signal(j)
             kept.append(jj)
+        else:
+            # A genuinely low-scoring job is a real, permanent judgment --
+            # keep marking those seen so they don't get rescored forever.
+            seen[k] = {"score": score, "employer_type": etype}
 
     kept.sort(key=lambda j: j["score"], reverse=True)
     save_seen(args.seen_file, seen)
