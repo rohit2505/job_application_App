@@ -1192,6 +1192,20 @@ def find_lever_form(page):
     return None
 
 
+def _is_captcha_related(*parts):
+    """True if any of id/name/etc. mentions captcha in any form. Used to
+    keep every general-purpose fill pass (select/textarea especially, which
+    have no other filter) from ever treating reCAPTCHA's own hidden
+    response field as an answerable question -- caught live on a real
+    posting, where the textarea pass had no such guard, derived
+    "g-recaptcha-response" as a fallback label, asked Claude to answer it,
+    and filled a nonsense answer directly into the actual g-recaptcha-
+    response field. That's exactly the kind of CAPTCHA interaction this
+    project must never do, even accidentally -- the hard rule is that a
+    human always solves the CAPTCHA itself, untouched by automation."""
+    return any("captcha" in (p or "").lower() for p in parts)
+
+
 def _field_label(frame, el, el_id):
     """Best-effort label text for a form field, trying progressively looser
     sources so a field is never treated as unlabeled just because its
@@ -1414,6 +1428,8 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
             identity = el_id or name
             if identity == "country":
                 continue  # already handled above via try_fill
+            if _is_captcha_related(el_id, name):
+                continue  # never treat a CAPTCHA-related field as a question
             label_text = _field_label(frame, el, el_id)
             options = []
             try:
@@ -1460,6 +1476,9 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
         for i in range(n):
             el = textareas.nth(i)
             el_id = el.get_attribute("id") or ""
+            name = el.get_attribute("name") or ""
+            if _is_captcha_related(el_id, name):
+                continue  # never treat a CAPTCHA-related field as a question
             label_text = _field_label(frame, el, el_id)
             if not label_text:
                 label_text = el_id  # see text-input pass above for why
