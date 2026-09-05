@@ -837,6 +837,47 @@ def _map_active_jobs_db_row(j, now, window_min, source_tag="activejobsdb"):
                salary_min=smin, salary_max=smax, description=desc)
 
 
+def _apify_usage_within_budget(token, cap_usd=None):
+    """Checks the account's actual current-month spend against a
+    self-imposed monthly cap BEFORE calling the paid Apify actor, so a run
+    can never push you past your own budget -- independent of, and in
+    addition to, whatever your free-tier/plan usage cap already is.
+    Configurable via APIFY_MAX_MONTHLY_USD (default 18). Fails OPEN (lets
+    the run proceed) if the usage check itself can't be reached -- a
+    transient issue reading your OWN account's usage shouldn't be treated
+    the same as actually being over budget, and the Apify actor call itself
+    still has its own hard stop if you're truly out of balance (see the
+    max-items-must-be-greater-than-zero handling already in place)."""
+    cap = cap_usd if cap_usd is not None else float(cfg("APIFY_MAX_MONTHLY_USD") or 18)
+    url = f"https://api.apify.com/v2/users/me/limits?token={token}"
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  [apify-budget] couldn't check account usage ({e}) -- "
+              f"proceeding rather than blocking the run on a transient "
+              f"check failure", file=sys.stderr)
+        return True
+    current = (data.get("data") or {}).get("current") or {}
+    usage = current.get("monthlyUsageUsd")
+    if usage is None:
+        print("  [apify-budget] usage field missing from response -- "
+              "proceeding rather than blocking on an unexpected API shape",
+              file=sys.stderr)
+        return True
+    if usage >= cap:
+        print(f"  [apify-budget] this month's Apify usage is ${usage:.2f}, "
+              f"at or above your ${cap:.2f} self-imposed cap -- skipping "
+              f"the paid actor call this run (nothing else in the pipeline "
+              f"needs Apify credits). Raise APIFY_MAX_MONTHLY_USD or wait "
+              f"for next month's reset to resume.", file=sys.stderr)
+        return False
+    print(f"  [apify-budget] this month's Apify usage is ${usage:.2f} of "
+          f"your ${cap:.2f} cap -- proceeding", file=sys.stderr)
+    return True
+
+
 def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     """Same fantastic.jobs dataset as fetch_active_jobs_db, but via Apify's
     pay-per-result actor (fantastic-jobs/career-site-job-listing-api)
@@ -848,6 +889,8 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     token = cfg("APIFY_TOKEN")
     if not token:
         print("  [activejobsdb_apify] skipped — set APIFY_TOKEN")
+        return []
+    if not _apify_usage_within_budget(token):
         return []
     time_frame = "24h" if window_min <= 1440 else ("7d" if window_min <= 10080 else "6m")
     # Was hardcoded to 15 -- with only ~1 in 4 postings in this dataset
