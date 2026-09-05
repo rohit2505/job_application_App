@@ -456,6 +456,7 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                 final_answer, source_tag = resolve_telegram_reply(
                     reply, item["question"], resume_text, profile)
                 item["answer"], item["source"] = final_answer, source_tag
+                remember_answer(item["question"], final_answer)
                 try:
                     el = filled_frame.get_by_label(item["question"]).first
                     if el.count():
@@ -582,7 +583,77 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
 # --------------------------------------------------------------------------- #
 # Claude — answer a screening question ONLY from real resume/profile facts
 # --------------------------------------------------------------------------- #
+QA_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "qa_cache.json")
+
+
+def _normalize_q(text):
+    """Collapse a question string down to a stable cache key -- lowercase,
+    punctuation/whitespace-insensitive, so "What's your notice period?" and
+    "what is your notice period" hit the same cache entry. Tolerates
+    non-string input (e.g. a mocked label in tests) rather than raising."""
+    try:
+        text = str(text) if text is not None else ""
+    except Exception:
+        text = ""
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def load_qa_cache():
+    try:
+        with open(QA_CACHE_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_qa_cache(cache):
+    try:
+        os.makedirs(os.path.dirname(QA_CACHE_PATH), exist_ok=True)
+        with open(QA_CACHE_PATH, "w") as f:
+            json.dump(cache, f, indent=2, sort_keys=True)
+    except Exception as e:
+        print(f"  [qa-cache] failed to save: {e}", file=sys.stderr)
+
+
+# Loaded once per process. Screening questions like "are you authorized to
+# work in the US", "do you require visa sponsorship", "notice period" recur
+# almost verbatim across postings/companies -- once you've answered one via
+# Telegram, there's no reason to ask again. Populated by remember_answer()
+# below, which is called only where a human actually supplied the answer
+# (Telegram reply), never from an AI guess -- so this cache only ever holds
+# answers you personally vouched for.
+_QA_CACHE = load_qa_cache()
+
+
+def cached_answer(question, options=None):
+    """Look up a previously human-answered question. If `options` is given
+    (a closed-ended field: select/checkbox/radio), only return the cached
+    answer when it's actually one of THIS form's choices -- the same
+    question text can still have different option wording/casing across
+    postings, and silently picking an option that doesn't exist would just
+    fail the select/check step."""
+    ans = _QA_CACHE.get(_normalize_q(question))
+    if not ans:
+        return None
+    if options and not any(ans.strip().lower() == o.strip().lower() for o in options):
+        return None
+    return ans
+
+
+def remember_answer(question, answer):
+    """Persist a human-supplied (Telegram) answer for reuse on future
+    applications. Never called with an AI-guessed answer -- see _QA_CACHE
+    comment above for why."""
+    if not question or not answer:
+        return
+    _QA_CACHE[_normalize_q(question)] = answer
+    save_qa_cache(_QA_CACHE)
+
+
 def answer_question(question, options, resume_text, profile):
+    cached = cached_answer(question, options)
+    if cached:
+        return cached
     key = cfg("ANTHROPIC_API_KEY")
     if not key:
         return None
@@ -1076,6 +1147,52 @@ def find_lever_form(page):
     return None
 
 
+def _field_label(frame, el, el_id):
+    """Best-effort label text for a form field, trying progressively looser
+    sources so a field is never treated as unlabeled just because its
+    label[for=...] pairing is missing. Greenhouse/Lever postings vary in
+    markup: some skip the for-attribute pairing and rely on aria-label,
+    aria-labelledby, or a wrapping <label> with no for at all. Previously
+    only label[for=id] was tried, and a miss meant the field was silently
+    skipped everywhere it's used -- no fill attempt, no log entry, so it
+    never became an "unanswered" question either. Confirmed live on
+    Spearmint Energy's Greenhouse form (several fields filled blank with no
+    Telegram heads-up)."""
+    if el_id:
+        try:
+            lbl = frame.locator(f"label[for='{el_id}']").first
+            if lbl.count():
+                text = (lbl.inner_text() or "").strip()
+                if text:
+                    return text
+        except Exception:
+            pass
+    try:
+        aria = el.get_attribute("aria-label")
+        if aria and aria.strip():
+            return aria.strip()
+    except Exception:
+        pass
+    try:
+        labelledby = el.get_attribute("aria-labelledby")
+        if labelledby:
+            text = frame.locator(f"#{labelledby}").first.inner_text()
+            if text and text.strip():
+                return text.strip()
+    except Exception:
+        pass
+    try:
+        # A <label> wrapping the input with no explicit for= pairing.
+        wrapper = el.locator("xpath=ancestor::label[1]").first
+        if wrapper.count():
+            text = (wrapper.inner_text() or "").strip()
+            if text:
+                return text
+    except Exception:
+        pass
+    return ""
+
+
 def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_path, log):
     """Fills Greenhouse's standalone job-boards.greenhouse.io application
     form. IMPORTANT: as of 2026-09, this UI's inputs carry the field's
@@ -1157,14 +1274,18 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
             if identity in ("first_name", "last_name", "email", "phone", "country",
                             "candidate-location") or not identity.startswith("question_"):
                 continue
-            label_text = ""
-            try:
-                if el_id:
-                    lbl = frame.locator(f"label[for='{el_id}']").first
-                    if lbl.count():
-                        label_text = (lbl.inner_text() or "").strip()
-            except Exception:
-                pass
+            label_text = _field_label(frame, el, el_id)
+            if not label_text:
+                # No real label found anywhere -- fall back to the field's
+                # own id/name so this question is never silently invisible.
+                # Previously a field with no matching label[for=...] just
+                # got skipped here entirely: no fill, no log entry at all,
+                # which meant it never reached the "unanswered" list and
+                # the Telegram question-escalation had nothing to trigger
+                # on -- confirmed live on Spearmint Energy's Greenhouse
+                # form, where several fields had to be filled manually on
+                # the VNC link with no heads-up beforehand.
+                label_text = identity
             matched = None
             low = label_text.lower()
             for kw, pkey in LABEL_KEYWORDS.items():
@@ -1175,13 +1296,12 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                 el.fill(str(matched))
                 log.append({"question": label_text, "answer": str(matched), "source": "profile"})
                 continue
-            if label_text:
-                ans = answer_question(label_text, None, resume_text, profile)
-                if ans:
-                    el.fill(ans)
-                    log.append({"question": label_text, "answer": ans, "source": "claude"})
-                else:
-                    log.append({"question": label_text, "answer": None, "source": "unanswered"})
+            ans = answer_question(label_text, None, resume_text, profile)
+            if ans:
+                el.fill(ans)
+                log.append({"question": label_text, "answer": ans, "source": "claude"})
+            else:
+                log.append({"question": label_text, "answer": None, "source": "unanswered"})
     except Exception as e:
         print(f"  [fill] text-question pass error: {e}", file=sys.stderr)
 
@@ -1244,14 +1364,7 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
             identity = el_id or name
             if identity == "country":
                 continue  # already handled above via try_fill
-            label_text = ""
-            try:
-                if el_id:
-                    lbl = frame.locator(f"label[for='{el_id}']").first
-                    if lbl.count():
-                        label_text = (lbl.inner_text() or "").strip()
-            except Exception:
-                pass
+            label_text = _field_label(frame, el, el_id)
             options = []
             try:
                 opt_els = el.locator("option")
@@ -1261,8 +1374,10 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                         options.append(text)
             except Exception:
                 pass
-            if not label_text or not options:
-                continue
+            if not options:
+                continue  # nothing to select regardless of label
+            if not label_text:
+                label_text = identity or name  # see text-input pass above for why
             matched = None
             low = label_text.lower()
             for kw, pkey in LABEL_KEYWORDS.items():
@@ -1294,16 +1409,9 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
         for i in range(n):
             el = textareas.nth(i)
             el_id = el.get_attribute("id") or ""
-            label_text = ""
-            try:
-                if el_id:
-                    lbl = frame.locator(f"label[for='{el_id}']").first
-                    if lbl.count():
-                        label_text = (lbl.inner_text() or "").strip()
-            except Exception:
-                pass
+            label_text = _field_label(frame, el, el_id)
             if not label_text:
-                continue
+                label_text = el_id  # see text-input pass above for why
             try:
                 if (el.input_value() or "").strip():
                     continue  # already has content (e.g. cover letter box)
@@ -1600,6 +1708,7 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
             final_answer, source_tag = resolve_telegram_reply(
                 reply, item["question"], resume_text, profile)
             item["answer"], item["source"] = final_answer, source_tag
+            remember_answer(item["question"], final_answer)
             try:
                 el = frame.get_by_label(item["question"]).first
                 if el.count():
