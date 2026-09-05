@@ -1415,37 +1415,98 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
 
-    # DIAGNOSTIC ONLY -- no fill behavior change. Caught live on Pie
-    # Insurance's job-boards.greenhouse.io posting: a REQUIRED question
-    # ("years of hands-on Snowflake administration experience") rendered
-    # as a "Select..." placeholder widget that none of our <select>/
-    # checkbox/text-input passes could see at all -- it isn't a native
-    # <select>, so it's very likely a custom JS combobox (react-select-
-    # style) used by this newer Greenhouse template. This dumps the real
-    # markup for any such widget so the actual detect-and-fill logic can
-    # be built against real structure instead of guessing at class names.
-    # Safe to leave in permanently: read-only, and does nothing if none
-    # of these widgets exist on a given page.
+    # Custom "react-select" style dropdown questions -- confirmed live on
+    # Pie Insurance's job-boards.greenhouse.io posting (this newer
+    # Greenhouse template renders ALL single-select AND "mark all that
+    # apply" multi-select questions -- including the EEO demographic
+    # survey -- as a react-select combobox, not a native <select> or
+    # checkbox group). The real interactive element is a hidden
+    # <input role="combobox" class="select__input"> with the same
+    # "question_<id>" naming convention as our other fields; options
+    # render into a "select__menu" that appears only while the combobox
+    # is focused/open, and a "select__value-container--is-multi" class
+    # marks a multi-select instance. This was previously completely
+    # invisible to every fill pass (no <select>, no checkbox, no plain
+    # text input), so every one of these -- often REQUIRED -- questions
+    # was silently left blank.
     try:
-        placeholder_widgets = frame.get_by_text("Select...", exact=True)
-        pw_count = placeholder_widgets.count()
-        print(f"  [diag] found {pw_count} 'Select...' placeholder widget(s) "
-              f"on this page (not native <select> -- these are currently "
-              f"invisible to every fill pass)", file=sys.stderr)
-        for i in range(min(pw_count, 10)):
+        combo_inputs = frame.locator("input.select__input[role='combobox']")
+        cn = combo_inputs.count()
+        for i in range(cn):
+            el = combo_inputs.nth(i)
+            el_id = el.get_attribute("id") or ""
+            name = el.get_attribute("name") or ""
+            if _is_captcha_related(el_id, name):
+                continue  # never treat a CAPTCHA-related field as a question
+            is_multi = False
             try:
-                el = placeholder_widgets.nth(i)
-                container = el.locator(
-                    "xpath=ancestor::*[self::div or self::fieldset][2]").first
-                html = (container.evaluate("el => el.outerHTML")
-                        if container.count()
-                        else el.evaluate("el => el.outerHTML"))
-                print(f"  [diag] widget[{i}] outerHTML (truncated to 2000 "
-                      f"chars): {html[:2000]}", file=sys.stderr)
+                value_container = el.locator(
+                    "xpath=ancestor::div[contains(@class,'select__value-container')][1]")
+                vc_class = value_container.get_attribute("class") or ""
+                is_multi = "select__value-container--is-multi" in vc_class
+            except Exception:
+                pass
+            label_text = _field_label(frame, el, el_id)
+            if not label_text:
+                label_text = el_id  # see text-input pass above for why
+
+            # Discover the real option list by opening the menu once,
+            # reading the option texts, then closing it again without
+            # selecting -- same gather-then-decide shape every other pass
+            # here uses.
+            options = []
+            try:
+                el.click()
+                menu = frame.locator("div.select__menu").first
+                menu.wait_for(state="visible", timeout=3000)
+                opt_els = frame.locator("div.select__option")
+                for oi in range(opt_els.count()):
+                    text = (opt_els.nth(oi).inner_text() or "").strip()
+                    if text:
+                        options.append(text)
+                el.press("Escape")
             except Exception as e:
-                print(f"  [diag] widget[{i}] inspect failed: {e}", file=sys.stderr)
+                print(f"  [fill] react-select '{label_text}': couldn't open "
+                      f"menu to read options: {e}", file=sys.stderr)
+            if not options:
+                continue  # nothing to select regardless of label
+
+            matched = None
+            low = label_text.lower()
+            for kw, pkey in LABEL_KEYWORDS.items():
+                if kw in low:
+                    matched = profile.get(pkey)
+                    break
+            if matched and any(str(matched).strip().lower() == o.lower() for o in options):
+                ans = str(matched)
+            else:
+                ans = answer_question(label_text, options, resume_text, profile)
+
+            def _select_react_option(value):
+                el.click()
+                el.fill("")
+                el.type(value, delay=20)
+                opt = frame.locator("div.select__option", has_text=value).first
+                opt.wait_for(state="visible", timeout=3000)
+                opt.click()
+
+            if ans:
+                try:
+                    if is_multi:
+                        for choice in [c.strip() for c in ans.split(",") if c.strip()]:
+                            _select_react_option(choice)
+                    else:
+                        _select_react_option(ans)
+                    log.append({"question": label_text, "answer": ans,
+                                "source": "profile" if matched else "claude"})
+                except Exception as e:
+                    log.append({"error": f"failed to select '{ans}' for "
+                                          f"'{label_text}' (react-select): {e}"})
+            else:
+                log.append({"question": label_text, "answer": None,
+                            "source": "unanswered", "options": options})
     except Exception as e:
-        print(f"  [diag] custom-dropdown scan error: {e}", file=sys.stderr)
+        print(f"  [fill] react-select pass error: {e}", file=sys.stderr)
 
     # <select> dropdown questions -- visa/work-authorization status,
     # how-did-you-hear-about-us, EEO gender/race/veteran/disability, etc.
@@ -1788,6 +1849,75 @@ def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, l
     except Exception as e:
         print(f"  [fill] lever textarea-question pass error: {e}", file=sys.stderr)
 
+    # Same react-select-style combobox handling as fill_greenhouse_form --
+    # not verified live on a Lever posting yet, but this pattern (a hidden
+    # <input role="combobox" class="select__input">) is common enough
+    # across ATS platforms that it's worth the same defensive pass here.
+    # No-op and harmless on any Lever posting that doesn't use it.
+    try:
+        combo_inputs = frame.locator("input.select__input[role='combobox']")
+        cn = combo_inputs.count()
+        for i in range(cn):
+            el = combo_inputs.nth(i)
+            el_id = el.get_attribute("id") or ""
+            name = el.get_attribute("name") or ""
+            if _is_captcha_related(el_id, name):
+                continue  # never treat a CAPTCHA-related field as a question
+            is_multi = False
+            try:
+                value_container = el.locator(
+                    "xpath=ancestor::div[contains(@class,'select__value-container')][1]")
+                vc_class = value_container.get_attribute("class") or ""
+                is_multi = "select__value-container--is-multi" in vc_class
+            except Exception:
+                pass
+            label_text = _field_label(frame, el, el_id)
+            if not label_text:
+                label_text = el_id
+
+            options = []
+            try:
+                el.click()
+                menu = frame.locator("div.select__menu").first
+                menu.wait_for(state="visible", timeout=3000)
+                opt_els = frame.locator("div.select__option")
+                for oi in range(opt_els.count()):
+                    text = (opt_els.nth(oi).inner_text() or "").strip()
+                    if text:
+                        options.append(text)
+                el.press("Escape")
+            except Exception as e:
+                print(f"  [fill] lever react-select '{label_text}': couldn't "
+                      f"open menu to read options: {e}", file=sys.stderr)
+            if not options:
+                continue
+
+            ans = answer_question(label_text, options, resume_text, profile)
+
+            def _select_react_option(value):
+                el.click()
+                el.fill("")
+                el.type(value, delay=20)
+                opt = frame.locator("div.select__option", has_text=value).first
+                opt.wait_for(state="visible", timeout=3000)
+                opt.click()
+
+            if ans:
+                try:
+                    if is_multi:
+                        for choice in [c.strip() for c in ans.split(",") if c.strip()]:
+                            _select_react_option(choice)
+                    else:
+                        _select_react_option(ans)
+                    log.append({"question": label_text, "answer": ans, "source": "claude"})
+                except Exception as e:
+                    log.append({"error": f"failed to select '{ans}' for "
+                                          f"'{label_text}' (react-select): {e}"})
+            else:
+                log.append({"question": label_text, "answer": None,
+                            "source": "unanswered", "options": options})
+    except Exception as e:
+        print(f"  [fill] lever react-select pass error: {e}", file=sys.stderr)
 
     return resume_uploaded
 
