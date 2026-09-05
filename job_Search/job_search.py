@@ -852,7 +852,7 @@ def _apify_usage_within_budget(token, cap_usd=None):
     url = f"https://api.apify.com/v2/users/me/limits?token={token}"
     try:
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=20, context=SSL_CTX) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"  [apify-budget] couldn't check account usage ({e}) -- "
