@@ -228,9 +228,13 @@ def send_email(subject, text_body, attach_paths=None):
 # instead of opening a second, nested sync_playwright() context in the same
 # thread -- Playwright's sync API does not support that and raises "It
 # looks like you are using Playwright Sync API inside the asyncio loop"
+
+# Sanity check: at most ONE VPS CAPTCHA hand-off per run (see comment on
+# escalate_to_remote_browser below). Reset to False at the top of main().
 # (hit live in CI, 2026-09). None when called standalone (e.g. the manual
 # test script), in which case escalate_to_remote_browser() opens its own.
 _ACTIVE_PLAYWRIGHT = None
+_ESCALATION_USED_THIS_RUN = False
 
 
 # --------------------------------------------------------------------------- #
@@ -292,9 +296,25 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
     'escalated_remote' in that case. Returns False if anything about the
     remote hand-off itself failed, so the caller falls back to the plain
     'captcha' status as before."""
+    global _ESCALATION_USED_THIS_RUN
     vps_host = cfg("VPS_HOST")
     if not vps_host:
         return False  # feature not configured — behave exactly as before
+
+    if _ESCALATION_USED_THIS_RUN:
+        # Only one CAPTCHA hand-off per run -- see the module-level comment
+        # on _ESCALATION_USED_THIS_RUN. Refusing here (rather than after
+        # opening a tab) means a second/third CAPTCHA job in the same run
+        # never touches the VPS browser at all, so it can't steal focus
+        # from whatever the human is mid-solving on the first one. This
+        # falls through to the plain "captcha" status, same as if VPS
+        # escalation weren't configured -- retry-eligible next run.
+        print("  [vps-escalate] already escalated one job this run — leaving "
+              "this one for the next run instead of competing for the same "
+              "VPS browser/VNC session", file=sys.stderr)
+        log.append({"error": "VPS already has one CAPTCHA job filled and waiting this "
+                              "run — not escalating a second one on top of it"})
+        return False
 
     ssh_key = cfg("VPS_SSH_KEY_PATH") or os.path.expanduser("~/.ssh/vps_key")
     ssh_user = cfg("VPS_SSH_USER") or "ubuntu"
@@ -521,6 +541,7 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                               "failed) -- you were never told to go finish this one. "
                               "Check TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID and "
                               "GMAIL_ADDRESS/GMAIL_APP_PASSWORD are set correctly."})
+    _ESCALATION_USED_THIS_RUN = True
     return True
 
 
@@ -1175,6 +1196,159 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
 
+    # <select> dropdown questions -- visa/work-authorization status,
+    # how-did-you-hear-about-us, EEO gender/race/veteran/disability, etc.
+    # Previously not handled at all: only input[type=text] and
+    # input[type=checkbox] were, so every posting using a dropdown for any
+    # custom question left it blank with no error.
+    try:
+        selects = frame.locator("select")
+        n = selects.count()
+        for i in range(n):
+            el = selects.nth(i)
+            el_id = el.get_attribute("id") or ""
+            name = el.get_attribute("name") or ""
+            identity = el_id or name
+            if identity == "country":
+                continue  # already handled above via try_fill
+            label_text = ""
+            try:
+                if el_id:
+                    lbl = frame.locator(f"label[for='{el_id}']").first
+                    if lbl.count():
+                        label_text = (lbl.inner_text() or "").strip()
+            except Exception:
+                pass
+            options = []
+            try:
+                opt_els = el.locator("option")
+                for oi in range(opt_els.count()):
+                    text = (opt_els.nth(oi).inner_text() or "").strip()
+                    if text:
+                        options.append(text)
+            except Exception:
+                pass
+            if not label_text or not options:
+                continue
+            matched = None
+            low = label_text.lower()
+            for kw, pkey in LABEL_KEYWORDS.items():
+                if kw in low:
+                    matched = profile.get(pkey)
+                    break
+            ans = None
+            if matched and any(str(matched).strip().lower() == o.lower() for o in options):
+                ans = str(matched)
+            else:
+                ans = answer_question(label_text, options, resume_text, profile)
+            if ans:
+                try:
+                    el.select_option(label=ans)
+                    log.append({"question": label_text, "answer": ans,
+                                "source": "profile" if matched else "claude"})
+                except Exception as e:
+                    log.append({"error": f"failed to select '{ans}' for '{label_text}': {e}"})
+            else:
+                log.append({"question": label_text, "answer": None, "source": "unanswered"})
+    except Exception as e:
+        print(f"  [fill] select pass error: {e}", file=sys.stderr)
+
+    # <textarea> free-text questions (cover letter notes, "tell us more",
+    # etc.) -- also previously unhandled.
+    try:
+        textareas = frame.locator("textarea")
+        n = textareas.count()
+        for i in range(n):
+            el = textareas.nth(i)
+            el_id = el.get_attribute("id") or ""
+            label_text = ""
+            try:
+                if el_id:
+                    lbl = frame.locator(f"label[for='{el_id}']").first
+                    if lbl.count():
+                        label_text = (lbl.inner_text() or "").strip()
+            except Exception:
+                pass
+            if not label_text:
+                continue
+            try:
+                if (el.input_value() or "").strip():
+                    continue  # already has content (e.g. cover letter box)
+            except Exception:
+                pass
+            ans = answer_question(label_text, None, resume_text, profile)
+            if ans:
+                try:
+                    el.fill(ans)
+                    log.append({"question": label_text, "answer": ans, "source": "claude"})
+                except Exception as e:
+                    log.append({"error": f"failed to fill textarea '{label_text}': {e}"})
+            else:
+                log.append({"question": label_text, "answer": None, "source": "unanswered"})
+    except Exception as e:
+        print(f"  [fill] textarea pass error: {e}", file=sys.stderr)
+
+    # Standalone radio-button question groups (yes/no, single-choice --
+    # distinct from the checkbox-group pass above, which only handles
+    # input[type=checkbox]). Same grouping/ask-Claude-then-select pattern
+    # fill_lever_form already uses for its own radio questions.
+    try:
+        radios = frame.locator("input[type='radio']")
+        n = radios.count()
+        groups = {}
+        for i in range(n):
+            el = radios.nth(i)
+            key = el.get_attribute("name") or ""
+            if not key:
+                continue
+            groups.setdefault(key, []).append(el)
+        for key, els in groups.items():
+            # Skip if one is already checked (e.g. a default selection) --
+            # only answer groups that are genuinely unanswered.
+            try:
+                if any(e.is_checked() for e in els):
+                    continue
+            except Exception:
+                pass
+            options = []
+            for el in els:
+                try:
+                    lbl_id = el.get_attribute("id")
+                    lbl = frame.locator(f"label[for='{lbl_id}']").first if lbl_id else None
+                    options.append((lbl.inner_text().strip() if lbl and lbl.count() else "", el))
+                except Exception:
+                    options.append(("", el))
+            fieldset_label = ""
+            try:
+                fs = els[0].locator("xpath=ancestor::fieldset[1]//legend").first
+                if fs.count():
+                    fieldset_label = fs.inner_text().strip()
+            except Exception:
+                pass
+            question = fieldset_label or key
+            opt_names = [o for o, _ in options if o]
+            if not opt_names:
+                continue
+            ans = answer_question(question, opt_names, resume_text, profile)
+            if ans:
+                chosen = ans.strip().lower()
+                picked = False
+                for label, el in options:
+                    if label.strip().lower() == chosen:
+                        try:
+                            el.check()
+                            picked = True
+                        except Exception:
+                            pass
+                        break
+                if picked:
+                    log.append({"question": question, "answer": ans, "source": "claude"})
+                else:
+                    log.append({"question": question, "answer": None, "source": "unanswered"})
+            else:
+                log.append({"question": question, "answer": None, "source": "unanswered"})
+    except Exception as e:
+        print(f"  [fill] radio pass error: {e}", file=sys.stderr)
 
     return resume_uploaded
 
@@ -1661,6 +1835,8 @@ def read_resume_text(path):
 
 
 def main():
+    global _ESCALATION_USED_THIS_RUN
+    _ESCALATION_USED_THIS_RUN = False
     load_keys_json()
     load_dotenv()
     ap = argparse.ArgumentParser(description="Stage 5: auto-submit Greenhouse applications")
