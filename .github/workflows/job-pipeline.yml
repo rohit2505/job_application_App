@@ -38,7 +38,7 @@ env:
   # one query here multiplies straight into the quota.
   JOB_QUERY: "data engineer"
   JOB_LOCATION: "United States"
-  WINDOW_MIN: "10080"         # look back 7d — matches the weekly cadence
+  WINDOW_MIN: "2880"          # look back 48h — only apply to fresh postings
   MIN_SALARY: "160000"
   MIN_SCORE: "70"
   TOP: "10"
