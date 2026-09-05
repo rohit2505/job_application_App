@@ -458,12 +458,21 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                     "iframe[src*='recaptcha'], .g-recaptcha, [name='g-recaptcha-response'], "
                     "iframe[src*='hcaptcha'], .h-captcha, [name='h-captcha-response']"
                 ).first
-                if captcha_el.count():
+                submit_el = filled_frame.get_by_role("button", name=re.compile("submit", re.I)).first
+                # Prefer the submit button when it exists: it's normally the
+                # last thing on the form (right below/near the captcha), so
+                # scrolling to it puts both the captcha AND the button you
+                # actually need to click in view. Only fall back to the
+                # captcha element alone, then a bare "End" keypress, if no
+                # submit button is found at all.
+                if submit_el.count():
+                    submit_el.scroll_into_view_if_needed(timeout=5000)
+                elif captcha_el.count():
                     captcha_el.scroll_into_view_if_needed(timeout=5000)
                 else:
                     rpage.keyboard.press("End")
             except Exception as e:
-                print(f"  [vps-escalate] scroll-to-captcha failed (non-fatal): {e}", file=sys.stderr)
+                print(f"  [vps-escalate] scroll-to-captcha/submit failed (non-fatal): {e}", file=sys.stderr)
         return filled
 
     filled_ok = False
@@ -486,17 +495,32 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         return False
 
     pw_note = f"\nVNC password: {novnc_password}" if novnc_password else ""
-    send_whatsapp(
+    wa_ok, wa_detail, _ = send_whatsapp(
         f"🖥️ Filled but hit a CAPTCHA — {title} @ {company}\n"
         f"Finish it here (solve the captcha, hit submit):\n{novnc_url}{pw_note}"
     )
-    send_email(
+    em_ok = send_email(
         f"[Action needed] {title} @ {company}",
         f"Form filled but blocked by a CAPTCHA. Finish it yourself here:\n{novnc_url}\n\n"
         f"Job link: {url}\n\n"
         f"Resume and cover letter attached for your records.",
         [resume_path, cover_path],
     )
+    # send_whatsapp()/send_email() both fail silently on their own (a print
+    # to stderr, nothing raised) so a missing/wrong TELEGRAM_* or GMAIL_*
+    # secret used to look IDENTICAL to "notified you successfully" -- the
+    # form would sit filled on the VPS with no way to know a notification
+    # was ever supposed to go out. Surface both results loudly, on stdout
+    # (not just stderr) so this shows up in the CI run summary, not just
+    # a buried log line.
+    print(f"  [vps-escalate] notify: telegram={'sent' if wa_ok else f'FAILED ({wa_detail})'}, "
+          f"email={'sent' if em_ok else 'FAILED'}")
+    if not (wa_ok or em_ok):
+        log.append({"error": "form filled and waiting on the VPS, but BOTH notification "
+                              "channels failed (telegram: " + str(wa_detail) + ", email: "
+                              "failed) -- you were never told to go finish this one. "
+                              "Check TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID and "
+                              "GMAIL_ADDRESS/GMAIL_APP_PASSWORD are set correctly."})
     return True
 
 
