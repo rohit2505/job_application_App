@@ -398,13 +398,16 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                       file=sys.stderr)
                 candidate_frame = None
 
+        resume_upload_reported_ok = False
         if candidate_frame is not None:
             if is_lever:
-                fill_lever_form(candidate_frame, job, profile, resume_text,
-                                 remote_resume, remote_cover, log)
+                resume_upload_reported_ok = fill_lever_form(
+                    candidate_frame, job, profile, resume_text,
+                    remote_resume, remote_cover, log)
             else:
-                fill_greenhouse_form(candidate_frame, job, profile, resume_text,
-                                      remote_resume, remote_cover, log)
+                resume_upload_reported_ok = fill_greenhouse_form(
+                    candidate_frame, job, profile, resume_text,
+                    remote_resume, remote_cover, log)
             filled_frame = candidate_frame
 
         # Never hand off a form that looks filled but silently isn't --
@@ -417,8 +420,19 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
         if filled_frame is not None:
             fields_ok = _required_fields_actually_filled(filled_frame, profile)
             # Only require the resume to have actually attached if we tried
-            # to attach one in the first place.
-            resume_ok = (not remote_resume) or _resume_actually_attached(filled_frame)
+            # to attach one in the first place. Trust set_input_files() not
+            # raising (resume_upload_reported_ok) as the primary signal --
+            # the post-hoc DOM check (element.files.length) is kept as a
+            # fallback confirmation only, since it can false-negative on
+            # sites whose own JS clears the native input's value after
+            # reading it (confirmed live on real Greenhouse postings that
+            # had genuinely uploaded fine but still failed the DOM-only
+            # check).
+            resume_ok = (
+                not remote_resume
+                or resume_upload_reported_ok
+                or _resume_actually_attached(filled_frame)
+            )
             if fields_ok and resume_ok:
                 filled = True
             else:
@@ -1016,13 +1030,22 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
     loc = ", ".join(x for x in (profile.get("location_city"), profile.get("location_state")) if x)
     try_fill("candidate-location", "candidate-location", loc)
 
-    # Resume / cover letter uploads. Deliberately NOT checking
-    # os.path.exists(path) here -- when this runs against a remote browser
-    # (escalate_to_remote_browser), `path` is a file on THAT machine (the
-    # VPS), not on whatever machine is running this Python process, so a
-    # local existence check would always silently fail and skip the
-    # upload with no error. set_input_files() checks existence on the
-    # correct (browser-side) machine itself.
+    # Resume / cover letter uploads. `path` is local to THIS process --
+    # set_input_files() reads the file client-side and streams its bytes
+    # over the CDP connection, so this works the same whether the target
+    # browser is local or (as in escalate_to_remote_browser) a remote VPS
+    # Chromium. (An earlier version of this comment claimed the opposite --
+    # that was based on a since-removed scp-to-VPS design and was wrong.)
+    #
+    # resume_uploaded tracks whether the *resume* specifically went through
+    # set_input_files() without raising -- returned below so callers (the
+    # VPS escalation gate) can use it instead of, or alongside, a post-hoc
+    # DOM check. The DOM check (element.files.length) can false-negative on
+    # sites whose own JS reads the file then clears the native input's
+    # value afterward -- confirmed live on real job-boards.greenhouse.io
+    # postings (Pie Insurance, Climate First Bank) that had genuinely
+    # uploaded correctly but still failed the old DOM-only check.
+    resume_uploaded = not resume_path
     for field_id, path in (("resume", resume_path), ("cover_letter", cover_path)):
         if not path:
             continue
@@ -1039,6 +1062,8 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
         if not uploaded:
             log.append({"error": f"no matching file input found for {field_id} "
                                   f"(#{field_id} / input[name='{field_id}'])"})
+        if field_id == "resume":
+            resume_uploaded = uploaded
 
     # Label-keyword-matched text fields (LinkedIn, website, how-did-you-hear, etc.)
     # — Greenhouse's custom questions are input#question_<num> with empty
@@ -1125,6 +1150,9 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                 log.append({"question": question, "answer": None, "source": "unanswered"})
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
+
+
+    return resume_uploaded
 
 
 def _required_fields_actually_filled(frame, profile):
@@ -1221,13 +1249,16 @@ def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, l
     try_fill("input[name='urls[GitHub]']", profile.get("github"))
     try_fill("input[name='urls[Portfolio]']", profile.get("portfolio_url"))
 
+    resume_uploaded = not resume_path
     for name, path in (("resume", resume_path),):
         if not path:
             continue
+        resume_uploaded = False
         try:
             el = frame.locator(f"input[name='{name}']").first
             if el.count():
                 el.set_input_files(path)
+                resume_uploaded = True
             else:
                 log.append({"error": f"no matching file input found for {name} "
                                       f"(input[name='{name}'])"})
@@ -1311,6 +1342,8 @@ def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, l
     except Exception as e:
         print(f"  [fill] lever textarea-question pass error: {e}", file=sys.stderr)
 
+
+    return resume_uploaded
 
 def _finish_application(page, frame, job, profile, resume_text, resume_path, cover_path, log):
     """Shared tail end for any ATS we can fill (Greenhouse, Lever, ...):
