@@ -141,6 +141,9 @@ def slug(s, n=40):
 # Telegram escalation — send the question, poll for your reply. Free, no
 # message limits, no expiring sandbox (unlike the Twilio WhatsApp sandbox).
 # --------------------------------------------------------------------------- #
+BOT_NAME = "JobBuddy"
+
+
 def send_whatsapp(body):
     """Name kept for call-site compatibility; sends via Telegram now.
     Returns (ok, detail, message_id) — message_id lets a caller track a
@@ -149,6 +152,7 @@ def send_whatsapp(body):
     if not (token and chat_id):
         return False, "telegram creds not set", None
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    body = f"🤖 {BOT_NAME}: {body}"
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": body}).encode()
     req = urllib.request.Request(url, data=data)
     try:
@@ -2060,6 +2064,105 @@ def read_resume_text(path):
     return open(path, encoding="utf-8").read()
 
 
+def _extract_fact_from_note(text):
+    """Ask Claude to turn a free-form note (something you messaged the bot
+    unprompted, not as a reply to a pending question -- e.g. "I have 1 yr
+    experience in Snowflake") into a (question, answer) pair worth caching
+    for future screening questions. Returns None if the note doesn't read
+    as a fact worth remembering this way (chit-chat, a question TO the
+    bot, something already answered elsewhere)."""
+    key = cfg("ANTHROPIC_API_KEY")
+    if not key:
+        return None
+    prompt = (
+        "The user is messaging their own job-application bot with a note "
+        "about themselves, meant to be remembered for future screening "
+        "questions on job applications (things like years of experience "
+        "with a technology, work authorization, location, salary "
+        "expectations, etc.).\n\n"
+        f"MESSAGE: {text}\n\n"
+        "If this message states a fact worth remembering as an answer to "
+        "some future screening question, reply with EXACTLY two lines:\n"
+        "QUESTION: <a short, generic screening-question phrasing this "
+        "answers, e.g. \"years of Snowflake experience\">\n"
+        "ANSWER: <the answer, e.g. \"1\">\n"
+        "If it is not a fact worth remembering this way (e.g. it's a "
+        "reply to something else, a question to you, or just chit-chat), "
+        "reply with exactly: NONE"
+    )
+    body = json.dumps({
+        "model": QA_MODEL, "max_tokens": 150,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+    req = urllib.request.Request(ANTHROPIC_URL, data=body, headers={
+        "x-api-key": key, "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        text_out = "".join(b.get("text", "") for b in data.get("content", [])).strip()
+    except Exception as e:
+        print(f"  [claude] fact-extraction error: {e}", file=sys.stderr)
+        return None
+    if text_out.strip().upper() == "NONE":
+        return None
+    q, a = None, None
+    for line in text_out.splitlines():
+        line = line.strip()
+        if line.upper().startswith("QUESTION:"):
+            q = line.split(":", 1)[1].strip()
+        elif line.upper().startswith("ANSWER:"):
+            a = line.split(":", 1)[1].strip()
+    return (q, a) if q and a else None
+
+
+def ingest_unsolicited_telegram_notes():
+    """At the start of each run, drain any Telegram messages you sent
+    unprompted -- not as a reply to a specific pending question -- and
+    merge each recognized fact into the persistent Q&A cache
+    (state/qa_cache.json), so a future screening question already has the
+    answer without ever needing to ask again. Runs once, non-blocking,
+    before any job is processed. Shares the same offset store as
+    wait_for_whatsapp_reply -- this always runs first in a given process,
+    so it only ever drains messages sent BEFORE this run started; anything
+    you send once a job is actively escalated and waiting on you goes to
+    that job's own wait_for_whatsapp_reply call instead, not here."""
+    token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
+    if not (token and chat_id):
+        return
+    offset = _load_telegram_offset()
+    url = (f"https://api.telegram.org/bot{token}/getUpdates?timeout=0"
+           f"&limit=100&offset={offset + 1}")
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
+            data = json.loads(r.read().decode())
+    except Exception as e:
+        print(f"  [telegram] ingest poll error: {e}", file=sys.stderr)
+        return
+    results = data.get("result", [])
+    if not results:
+        return
+    max_offset = offset
+    for upd in results:
+        max_offset = max(max_offset, upd.get("update_id", max_offset))
+        msg = upd.get("message", {})
+        chat = msg.get("chat", {})
+        if str(chat.get("id")) != str(chat_id):
+            continue
+        text = (msg.get("text") or "").strip()
+        if not text:
+            continue
+        fact = _extract_fact_from_note(text)
+        if fact:
+            q, a = fact
+            remember_answer(q, a)
+            print(f"  [telegram] learned from your message: \"{q}\" -> \"{a}\"",
+                  file=sys.stderr)
+    _save_telegram_offset(max_offset)
+
+
 def main():
     global _ESCALATION_USED_THIS_RUN
     _ESCALATION_USED_THIS_RUN = False
@@ -2099,6 +2202,8 @@ def main():
         profile = json.load(open(args.profile, encoding="utf-8"))
     except Exception:
         profile = {}
+
+    ingest_unsolicited_telegram_notes()
 
     seen = load_seen(args.seen_file)
     success = load_seen(args.success_file)
