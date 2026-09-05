@@ -161,6 +161,27 @@ def send_whatsapp(body):
         return False, f"send error: {e}", None
 
 
+TELEGRAM_OFFSET_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "state", "telegram_update_offset.json")
+
+
+def _load_telegram_offset():
+    try:
+        with open(TELEGRAM_OFFSET_PATH) as f:
+            return int(json.load(f).get("offset") or 0)
+    except Exception:
+        return 0
+
+
+def _save_telegram_offset(offset):
+    try:
+        os.makedirs(os.path.dirname(TELEGRAM_OFFSET_PATH), exist_ok=True)
+        with open(TELEGRAM_OFFSET_PATH, "w") as f:
+            json.dump({"offset": offset}, f, indent=2)
+    except Exception as e:
+        print(f"  [telegram] failed to save update offset: {e}", file=sys.stderr)
+
+
 def wait_for_whatsapp_reply(after_ts, timeout_s=WHATSAPP_WAIT_SECONDS):
     """Poll Telegram getUpdates for a message from your chat, sent after
     after_ts. Returns the text, or None if nothing arrives in time / creds
@@ -168,10 +189,22 @@ def wait_for_whatsapp_reply(after_ts, timeout_s=WHATSAPP_WAIT_SECONDS):
     token, chat_id = cfg("TELEGRAM_BOT_TOKEN"), cfg("TELEGRAM_CHAT_ID")
     if not (token and chat_id):
         return None
-    url = f"https://api.telegram.org/bot{token}/getUpdates?timeout=0&limit=20"
+    # IMPORTANT: getUpdates never confirmed an `offset` here before, which
+    # means Telegram treated every reply you've EVER sent as still-unread
+    # and kept re-returning them oldest-first, forever. Once that backlog
+    # passed the old `limit=20` cap, the actual newest reply (the one
+    # answering THIS question) fell outside the window and was invisible --
+    # this is very likely why a real Telegram answer sometimes didn't get
+    # picked up. Persisting the offset (state/telegram_update_offset.json)
+    # and confirming it after every poll keeps the backlog from ever
+    # re-accumulating, and also means we naturally only ever see updates
+    # newer than the last one we've already processed.
+    offset = _load_telegram_offset()
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         time.sleep(WHATSAPP_POLL_SECONDS)
+        url = (f"https://api.telegram.org/bot{token}/getUpdates?timeout=0"
+               f"&limit=100&offset={offset + 1}")
         req = urllib.request.Request(url)
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT, context=SSL_CTX) as r:
@@ -179,13 +212,23 @@ def wait_for_whatsapp_reply(after_ts, timeout_s=WHATSAPP_WAIT_SECONDS):
         except Exception as e:
             print(f"  [telegram] poll error: {e}", file=sys.stderr)
             continue
-        for upd in data.get("result", []):
+        results = data.get("result", [])
+        found = None
+        for upd in results:
+            offset = max(offset, upd.get("update_id", offset))
             msg = upd.get("message", {})
             chat = msg.get("chat", {})
             if str(chat.get("id")) != str(chat_id):
                 continue
-            if msg.get("date", 0) > after_ts and msg.get("text", "").strip():
-                return msg["text"].strip()
+            if msg.get("date", 0) > after_ts and msg.get("text", "").strip() and not found:
+                found = msg["text"].strip()
+        if results:
+            # Confirm we've seen these regardless of whether one matched --
+            # an old/irrelevant message must never be allowed to reappear
+            # and get mistaken for the answer to a different question later.
+            _save_telegram_offset(offset)
+        if found:
+            return found
     return None
 
 
@@ -444,10 +487,12 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
             unanswered = [q for q in log if q.get("source") == "unanswered"]
             for item in unanswered:
                 asked_at = time.time()
+                opts = item.get("options")
+                opts_txt = f"\nOptions: {', '.join(opts)}" if opts else ""
                 sent, _detail, _msg_id = send_whatsapp(
                     f"🧑‍💻 Stuck on {job.get('company','')} application "
                     f"(filled remotely, waiting on a CAPTCHA too):\n"
-                    f"\"{item['question']}\"\nReply with your answer.")
+                    f"\"{item['question']}\"{opts_txt}\nReply with your answer.")
                 if not sent:
                     continue  # can't ask -- leave it unanswered, don't block the hand-off
                 reply = wait_for_whatsapp_reply(asked_at)
@@ -1345,7 +1390,12 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                             pass
                 log.append({"question": question, "answer": ans, "source": "claude"})
             else:
-                log.append({"question": question, "answer": None, "source": "unanswered"})
+                # `options` carried along so a Telegram escalation can show
+                # you the actual choices on THIS form -- otherwise you'd
+                # have to go find the VNC link just to see what you're
+                # allowed to answer with.
+                log.append({"question": question, "answer": None,
+                            "source": "unanswered", "options": opt_names})
     except Exception as e:
         print(f"  [fill] checkbox pass error: {e}", file=sys.stderr)
 
@@ -1397,7 +1447,8 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                 except Exception as e:
                     log.append({"error": f"failed to select '{ans}' for '{label_text}': {e}"})
             else:
-                log.append({"question": label_text, "answer": None, "source": "unanswered"})
+                log.append({"question": label_text, "answer": None,
+                            "source": "unanswered", "options": options})
     except Exception as e:
         print(f"  [fill] select pass error: {e}", file=sys.stderr)
 
@@ -1485,9 +1536,11 @@ def fill_greenhouse_form(frame, job, profile, resume_text, resume_path, cover_pa
                 if picked:
                     log.append({"question": question, "answer": ans, "source": "claude"})
                 else:
-                    log.append({"question": question, "answer": None, "source": "unanswered"})
+                    log.append({"question": question, "answer": None,
+                                "source": "unanswered", "options": opt_names})
             else:
-                log.append({"question": question, "answer": None, "source": "unanswered"})
+                log.append({"question": question, "answer": None,
+                            "source": "unanswered", "options": opt_names})
     except Exception as e:
         print(f"  [fill] radio pass error: {e}", file=sys.stderr)
 
@@ -1651,7 +1704,8 @@ def fill_lever_form(frame, job, profile, resume_text, resume_path, cover_path, l
                             pass
                 log.append({"question": question, "answer": ans, "source": "claude"})
             else:
-                log.append({"question": question, "answer": None, "source": "unanswered"})
+                log.append({"question": question, "answer": None,
+                            "source": "unanswered", "options": opt_names})
     except Exception as e:
         print(f"  [fill] lever radio-question pass error: {e}", file=sys.stderr)
 
@@ -1697,9 +1751,11 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
         # a blank required question.
         for item in unanswered:
             asked_at = time.time()
+            opts = item.get("options")
+            opts_txt = f"\nOptions: {', '.join(opts)}" if opts else ""
             sent, _detail, _msg_id = send_whatsapp(
                 f"🧑‍💻 Stuck on {job.get('company','')} application:\n"
-                f"\"{item['question']}\"\nReply with your answer.")
+                f"\"{item['question']}\"{opts_txt}\nReply with your answer.")
             if not sent:
                 return "unanswered", log, None
             reply = wait_for_whatsapp_reply(asked_at)
