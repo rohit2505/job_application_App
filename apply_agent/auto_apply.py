@@ -39,6 +39,7 @@ import re
 import ssl
 import sys
 import time
+import jobbuddy_agent
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -493,19 +494,16 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                 asked_at = time.time()
                 opts = item.get("options")
                 opts_txt = f"\nOptions: {', '.join(opts)}" if opts else ""
-                sent, _detail, _msg_id = send_whatsapp(
-                    f"🧑‍💻 Stuck on {job.get('company','')} application "
-                    f"(filled remotely, waiting on a CAPTCHA too):\n"
-                    f"\"{item['question']}\"{opts_txt}\nReply with your answer.")
-                if not sent:
-                    continue  # can't ask -- leave it unanswered, don't block the hand-off
-                reply = wait_for_whatsapp_reply(asked_at)
-                if not reply:
-                    continue  # no reply in time -- leave it unanswered, don't block the hand-off
-                final_answer, source_tag = resolve_telegram_reply(
-                    reply, item["question"], resume_text, profile)
+                final_answer, source_tag = jobbuddy_agent.resolve_unanswered_question(
+                    item["question"], opts, resume_text, profile,
+                    answer_question=answer_question,
+                    ai_polish_answer=ai_polish_answer,
+                    send_whatsapp=send_whatsapp,
+                    wait_for_whatsapp_reply=wait_for_whatsapp_reply,
+                    remember_answer=remember_answer)
+                if not final_answer:
+                    continue  # nothing confirmed in time -- leave it unanswered, don't block the hand-off
                 item["answer"], item["source"] = final_answer, source_tag
-                remember_answer(item["question"], final_answer)
                 try:
                     el = filled_frame.get_by_label(item["question"]).first
                     if el.count():
@@ -1776,18 +1774,16 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
             asked_at = time.time()
             opts = item.get("options")
             opts_txt = f"\nOptions: {', '.join(opts)}" if opts else ""
-            sent, _detail, _msg_id = send_whatsapp(
-                f"🧑‍💻 Stuck on {job.get('company','')} application:\n"
-                f"\"{item['question']}\"{opts_txt}\nReply with your answer.")
-            if not sent:
-                return "unanswered", log, None
-            reply = wait_for_whatsapp_reply(asked_at)
-            if not reply:
-                return "unanswered", log, None
-            final_answer, source_tag = resolve_telegram_reply(
-                reply, item["question"], resume_text, profile)
+            final_answer, source_tag = jobbuddy_agent.resolve_unanswered_question(
+                item["question"], opts, resume_text, profile,
+                answer_question=answer_question,
+                ai_polish_answer=ai_polish_answer,
+                send_whatsapp=send_whatsapp,
+                wait_for_whatsapp_reply=wait_for_whatsapp_reply,
+                remember_answer=remember_answer)
+            if not final_answer:
+                return "unanswered", log, None  # nothing confirmed in time -- never submit with a blank required question
             item["answer"], item["source"] = final_answer, source_tag
-            remember_answer(item["question"], final_answer)
             try:
                 el = frame.get_by_label(item["question"]).first
                 if el.count():
