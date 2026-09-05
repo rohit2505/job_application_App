@@ -504,12 +504,7 @@ def escalate_to_remote_browser(url, job, profile, resume_text, resume_path, cove
                 if not final_answer:
                     continue  # nothing confirmed in time -- leave it unanswered, don't block the hand-off
                 item["answer"], item["source"] = final_answer, source_tag
-                try:
-                    el = filled_frame.get_by_label(item["question"]).first
-                    if el.count():
-                        el.fill(final_answer)
-                except Exception:
-                    pass
+                _commit_resolved_answer(filled_frame, item["question"], final_answer)
 
         # Never hand off a form that looks filled but silently isn't --
         # same guard the normal (non-escalated) flow applies before
@@ -697,7 +692,28 @@ def remember_answer(question, answer):
     save_qa_cache(_QA_CACHE)
 
 
+_EEO_KEYWORDS = (
+    "gender identity", "racial", "ethnic background", "sexual orientation",
+    "transgender", "disability", "chronic condition", "veteran",
+    "armed forces", "protected veteran",
+)
+
+
+def _is_eeo_question(text):
+    """True for the voluntary EEO/demographic self-identification survey
+    (gender identity, race/ethnicity, sexual orientation, disability,
+    veteran status, etc.) that Greenhouse and similar ATSes commonly
+    include. These are never something a resume can answer -- and the
+    AI must never guess or pick a 'decline to answer'-style option on
+    its own here, even when one is offered among the choices. Always
+    forced to escalate to Telegram so you make this call yourself."""
+    low = (text or "").lower()
+    return any(kw in low for kw in _EEO_KEYWORDS)
+
+
 def answer_question(question, options, resume_text, profile):
+    if _is_eeo_question(question):
+        return None  # always escalate -- never let the AI pick an EEO answer, "decline" included
     cached = cached_answer(question, options)
     if cached:
         return cached
@@ -786,6 +802,42 @@ def ai_polish_answer(question, raw_notes, resume_text, profile):
 # first attempt was wrong to give up, or you want it to try again.
 _AI_ANSWER_PHRASES = {"ai", "ai answer", "ai answer it", "you answer",
                        "you answer it", "answer it", "let ai answer"}
+
+
+def _commit_resolved_answer(frame, question, answer):
+    """Apply a fully-resolved answer (from cache, JobBuddy, or your own
+    Telegram reply) to the live field. A plain .fill() only works for a
+    real text input -- for a react-select combobox, filling the hidden
+    search input does NOT select an option (react-select never fires its
+    onChange/actual-value update from a programmatic fill), so the field
+    stays empty even though nothing raised an error. Caught live: a
+    Telegram reply of "TX" for the State field resolved correctly but
+    never actually landed on the page for exactly this reason. Detects a
+    react-select field by its role=combobox + select__input class and
+    drives it the same way the fill passes do: open the menu, type the
+    value, click the matching option. Returns True if something was
+    applied, False otherwise -- never raises."""
+    try:
+        el = frame.get_by_label(question).first
+        if not el.count():
+            return False
+        role = (el.get_attribute("role") or "")
+        el_class = (el.get_attribute("class") or "")
+        if role == "combobox" and "select__input" in el_class:
+            for choice in [c.strip() for c in answer.split(",") if c.strip()] or [answer]:
+                el.click()
+                el.fill("")
+                el.type(choice, delay=20)
+                opt = frame.locator("div.select__option", has_text=choice).first
+                opt.wait_for(state="visible", timeout=3000)
+                opt.click()
+        else:
+            el.fill(answer)
+        return True
+    except Exception as e:
+        print(f"  [fill] couldn't commit resolved answer for '{question}': {e}",
+              file=sys.stderr)
+        return False
 
 
 def resolve_telegram_reply(reply, question, resume_text, profile):
@@ -1946,12 +1998,7 @@ def _finish_application(page, frame, job, profile, resume_text, resume_path, cov
             if not final_answer:
                 return "unanswered", log, None  # nothing confirmed in time -- never submit with a blank required question
             item["answer"], item["source"] = final_answer, source_tag
-            try:
-                el = frame.get_by_label(item["question"]).first
-                if el.count():
-                    el.fill(final_answer)
-            except Exception:
-                pass
+            _commit_resolved_answer(frame, item["question"], final_answer)
 
     if has_captcha(frame):  # re-check — some forms reveal it after fields are filled
         escalated = escalate_to_remote_browser(page.url, job, profile, resume_text, resume_path, cover_path, log)
