@@ -293,21 +293,72 @@ _SYS = ("You are a precise technical recruiter. Do TWO things for the given job.
         "phrases like 'our client', 'contract', 'contract-to-hire', 'W2', "
         "'multiple positions', staffing/consulting/solutions/resourcing in the "
         "company name.\n"
+        "3) If SALARY_KNOWN is false, look for real compensation figures "
+        "stated anywhere in the description text itself (e.g. \"$150,000-"
+        "$180,000\", \"compensation range of $140k to $170k\", a listed "
+        "hourly rate, etc.) and extract them as an ANNUAL USD estimate in "
+        "extracted_salary_min/extracted_salary_max. Convert hourly/monthly "
+        "figures to an annual estimate. Use null for either value (or both) "
+        "if no real number is stated anywhere -- never guess or infer a "
+        "figure from role/seniority/location; only extract a number that is "
+        "actually written in the text. If SALARY_KNOWN is true, always "
+        "return null for both (a real source-provided figure already "
+        "exists, so a re-derived model guess adds risk of being wrong "
+        "without adding accuracy).\n"
         "Reply with ONLY compact JSON: "
         '{"score": <int 0-100>, "reason": "<=18 words", '
-        '"employer_type": "direct|staffing|consulting|unknown"}. No other text.')
+        '"employer_type": "direct|staffing|consulting|unknown", '
+        '"extracted_salary_min": <int or null>, '
+        '"extracted_salary_max": <int or null>}. No other text.')
+
+
+def format_salary_range(smin, smax):
+    """Human-readable salary display. Treats 0 as "not really given" (some
+    sources use 0 for unknown) rather than a real floor of $0. Mirrors
+    job_Search/job_search.py's helper of the same name -- kept as a local
+    copy so this module doesn't need to import across the sibling stage."""
+    smin = smin or None
+    smax = smax or None
+    if smin and smax:
+        return f"{smin:,.0f}–{smax:,.0f}"
+    if smax:
+        return f"up to {smax:,.0f}"
+    if smin:
+        return f"{smin:,.0f}+"
+    return None
+
+
+def salary_floor_ok(job, min_salary, require_salary):
+    """Same policy as job_Search/job_search.py's salary_ok(): compare the
+    job's upper listed figure (salary_max, else salary_min) against the
+    floor; a job with genuinely no salary info anywhere (source API nor,
+    after score_job's JD-extraction pass, the description text itself) is
+    KEPT by default -- most good postings just don't publish pay, and
+    dropping them would throw away real candidates. Pass require_salary=True
+    to drop those too."""
+    if not min_salary:
+        return True
+    smax, smin = job.get("salary_max") or None, job.get("salary_min") or None
+    top = smax if smax else smin
+    if not top:
+        return not require_salary
+    return top >= min_salary
 
 
 def score_job(resume, job, model, key):
+    salary_known = bool(job.get("salary_max") or job.get("salary_min"))
     user = (f"RESUME:\n{resume}\n\n"
             f"JOB\nTitle: {job.get('title','')}\n"
             f"Company: {job.get('company','')}\n"
             f"Salary: {job.get('salary','')}\n"
+            f"SALARY_KNOWN: {str(salary_known).lower()}\n"
             f"Description:\n{job.get('description','')[:4000]}\n\n"
-            "Score fit and classify the employer. JSON only.")
+            "Score fit, classify the employer, and (only if SALARY_KNOWN is "
+            "false) extract any real salary figures stated in the "
+            "description. JSON only.")
     body = json.dumps({
         "model": model,
-        "max_tokens": 150,
+        "max_tokens": 200,
         "system": _SYS,
         "messages": [{"role": "user", "content": user}],
     }).encode("utf-8")
@@ -321,14 +372,18 @@ def score_job(resume, job, model, key):
     text = "".join(b.get("text", "") for b in data.get("content", []))
     mobj = re.search(r"\{.*\}", text, re.DOTALL)
     if not mobj:
-        return None, "no JSON from model", "unknown"
+        return None, "no JSON from model", "unknown", None, None
     obj = json.loads(mobj.group(0))
     score = max(0, min(100, int(obj.get("score"))))
     reason = str(obj.get("reason", ""))[:200]
     etype = str(obj.get("employer_type", "unknown")).strip().lower()
     if etype not in ("direct", "staffing", "consulting", "outsourcing", "agency", "unknown"):
         etype = "unknown"
-    return score, reason, etype
+    esmin = obj.get("extracted_salary_min")
+    esmax = obj.get("extracted_salary_max")
+    esmin = int(esmin) if isinstance(esmin, (int, float)) and esmin > 0 else None
+    esmax = int(esmax) if isinstance(esmax, (int, float)) and esmax > 0 else None
+    return score, reason, etype, esmin, esmax
 
 
 # --------------------------------------------------------------------------- #
@@ -411,6 +466,10 @@ def send_digest(scored, label):
 
 
 # --------------------------------------------------------------------------- #
+def env_flag(name):
+    return str(os.environ.get(name, "")).strip().lower() in ("1", "true", "yes", "on")
+
+
 def main():
     load_keys_json()
     load_dotenv()
@@ -436,6 +495,16 @@ def main():
                          "List yours: curl https://api.anthropic.com/v1/models "
                          "-H \"x-api-key: $KEY\" -H \"anthropic-version: 2023-06-01\"")
     ap.add_argument("--min-score", type=int, default=int(os.environ.get("MIN_SCORE", 70)))
+    ap.add_argument("--min-salary", type=int,
+                    default=int(os.environ["MIN_SALARY"]) if os.environ.get("MIN_SALARY") else None,
+                    help="drop jobs below this annual salary floor. Compares the "
+                         "source API's own salary_min/salary_max when known; "
+                         "otherwise a figure Claude finds stated in the JD text "
+                         "itself. A job with no salary info ANYWHERE is kept by "
+                         "default -- see --require-salary.")
+    ap.add_argument("--require-salary", action="store_true", default=env_flag("REQUIRE_SALARY"),
+                    help="also drop jobs where no salary figure was found at all "
+                         "(neither the source API nor the JD text)")
     ap.add_argument("--max-calls", type=int, default=int(os.environ.get("MAX_CALLS", 60)),
                     help="cap the number of Claude scoring calls per run (cost guard)")
     ap.add_argument("--seen-file", default=os.environ.get("SEEN_FILE", "state/seen_scored.json"))
@@ -477,9 +546,11 @@ def main():
           + (", keep-no-sponsor" if args.keep_no_sponsor else ", drop-no-sponsor")
           + (f", direct-only (blocklist {len(staffing[0])})" if staffing else ", staffing ALLOWED")
           + (", strict-direct" if args.strict_direct else "")
+          + (f", min-salary=${args.min_salary:,}" + ("+known" if args.require_salary else
+             " (API or JD-extracted; unknown-salary jobs kept)") if args.min_salary else "")
           + f", max-calls={args.max_calls}")
 
-    kept, calls, skipped_seen, dropped_spon, dropped_staff = [], 0, 0, 0, 0
+    kept, calls, skipped_seen, dropped_spon, dropped_staff, dropped_salary = [], 0, 0, 0, 0, 0
     for j in jobs:
         k = job_key(j)
         company = j.get("company", "")
@@ -504,7 +575,7 @@ def main():
             break
         calls += 1
         try:
-            score, reason, etype = score_job(resume, j, model, key)
+            score, reason, etype, esmin, esmax = score_job(resume, j, model, key)
         except Exception as e:
             print(f"  [score] error on '{j.get('title','')[:40]}': {e}", file=sys.stderr)
             continue
@@ -515,6 +586,24 @@ def main():
                                         or (args.strict_direct and etype == "unknown")):
             seen[k] = {"drop": f"employer_type:{etype}", "score": score}
             dropped_staff += 1
+            continue
+        # The source API gave no structured salary for this job (job_Search
+        # already dropped anything with a known, too-low salary -- this is
+        # only the "unknown" bucket it let through). If Claude found a real
+        # figure stated in the JD text itself, use it here instead of
+        # leaving the job's true pay unenforced and undisplayed.
+        salary_min, salary_max = j.get("salary_min"), j.get("salary_max")
+        salary_source = "api" if (salary_min or salary_max) else None
+        if not (salary_min or salary_max) and (esmin or esmax):
+            salary_min, salary_max = esmin, esmax
+            salary_source = "jd_extracted"
+        if args.min_salary and not salary_floor_ok(
+                {"salary_min": salary_min, "salary_max": salary_max},
+                args.min_salary, args.require_salary):
+            seen[k] = {"drop": "below_min_salary", "score": score,
+                       "salary_min": salary_min, "salary_max": salary_max,
+                       "salary_source": salary_source}
+            dropped_salary += 1
             continue
         if score >= args.min_score:
             # Deliberately NOT added to `seen` -- a job that clears the score
@@ -539,6 +628,13 @@ def main():
             jj = dict(j)
             jj["score"], jj["reason"], jj["employer_type"] = score, reason, etype
             jj["remote_signal"] = remote_signal(j)
+            if salary_source == "jd_extracted":
+                # Persist the JD-derived figure downstream (resume tailoring,
+                # digests, auto-apply logging) -- otherwise it only ever
+                # existed inside this loop iteration.
+                jj["salary_min"], jj["salary_max"] = salary_min, salary_max
+                jj["salary"] = format_salary_range(salary_min, salary_max) or jj.get("salary")
+                jj["salary_source"] = salary_source
             kept.append(jj)
         else:
             # A genuinely low-scoring job is a real, permanent judgment --
@@ -558,6 +654,7 @@ def main():
 
     print(f"\nScored {calls} new job(s) · {len(kept)} >= {args.min_score} · "
           f"{dropped_spon} dropped (sponsorship) · {dropped_staff} dropped (staffing/consulting) · "
+          f"{dropped_salary} dropped (below min salary) · "
           f"{skipped_seen} already seen.\n")
     for j in kept:
         print(f"[{j['score']}] {j.get('title','')} — {j.get('company','')} "

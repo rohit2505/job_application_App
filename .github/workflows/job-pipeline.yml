@@ -104,9 +104,16 @@ jobs:
       - name: Stage 2 — filter + score
         working-directory: job_filter_agent
         run: |
+          # --min-salary is a second, JD-aware pass on top of job_Search's own
+          # MIN_SALARY filter: that stage already drops anything with a KNOWN
+          # salary below the floor before this even runs, so this only
+          # matters for the "salary unknown to the source API" jobs it let
+          # through -- Claude looks for a real figure stated in the JD text
+          # itself (see score_job()) and applies the same floor to that.
           python3 filter_agent.py \
             --jobs ../job_Search/jobs.json \
             --min-score "$MIN_SCORE" \
+            --min-salary "$MIN_SALARY" \
             --scored-out scored.json \
             --any-company \
             --no-email
