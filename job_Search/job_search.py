@@ -1336,8 +1336,10 @@ def print_jobs(jobs, new_ids, now):
             badges = ("  [REMOTE]" if j["remote"] else "") + \
                      ("  [VISA]" if "visa_sponsorship" in j["tags"] else "")
             print(f"[{i}] {j['title']}{badges}{new}")
-            print(f"    {j['company']} — {j['location']}"
-                  + (f" · {age_str(j['posted'], now)}" if j['posted'] else ""))
+            posted_str = (f" · {age_str(j['posted'], now)} "
+                          f"(posted {j['posted'].strftime('%Y-%m-%d %H:%M UTC')})"
+                          if j['posted'] else "")
+            print(f"    {j['company']} — {j['location']}" + posted_str)
             if j["salary"] != "—":
                 print(f"    Salary: {j['salary']}")
             print(f"    {j['url']}")
