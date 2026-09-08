@@ -17,6 +17,10 @@
 "employer_type": "direct",
 "score": 42
 },
+"https://jobs.lever.co/jobgether/74292a8d-1526-4eb6-abce-1f8e86ba594c": {
+"drop": "employer_type:staffing",
+"score": 62
+},
 "https://jobs.lever.co/jobgether/a42d344e-154a-4356-8778-307d4cbc3e31": {
 "drop": "employer_type:staffing",
 "score": 78
