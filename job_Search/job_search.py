@@ -64,10 +64,13 @@ ALL_SOURCES = ["remotive", "arbeitnow", "adzuna", "jobicy", "muse", "remoteok",
 # auto-fillable anyway.
 #
 # Now on the Apify transport (activejobsdb_apify), NOT the RapidAPI one
-# (activejobsdb) — Apify is pay-per-result (~$0.012/job + ~$0.01/run,
-# covered by the $5/month free Apify credit at our current volume) rather
-# than RapidAPI's hard 250 jobs/25 requests per month cap, so there's no
-# quota cliff to budget around. fetch_active_jobs_db_apify() already
+# (activejobsdb) — Apify is pay-per-result (the actor's own advertised rate
+# is $4.00/1,000 jobs) rather than RapidAPI's hard 250 jobs/25 requests per
+# month cap, so there's no quota cliff to budget around. Real per-run cost
+# also includes Apify's own platform compute charge (memory x runtime) on
+# top of that -- fetch_active_jobs_db_apify() now pins memory low and caps
+# total run cost explicitly (see its docstring) rather than leaving that
+# uncontrolled. fetch_active_jobs_db_apify() already
 # filters to ats=[greenhouse, lever.co, ashby] since those are the only ATS
 # forms auto_apply.py can currently fill.
 DEFAULT_SOURCES = ["activejobsdb_apify"]
@@ -881,10 +884,16 @@ def _apify_usage_within_budget(token, cap_usd=None):
 def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     """Same fantastic.jobs dataset as fetch_active_jobs_db, but via Apify's
     pay-per-result actor (fantastic-jobs/career-site-job-listing-api)
-    instead of the RapidAPI free tier. No hard monthly cap here — cost is
-    ~$0.012/job + ~$0.01/run instead, billed to your Apify account. Filters
-    to Greenhouse/Lever/Ashby by default since those are the only ATS forms
-    auto_apply.py can currently fill.
+    instead of the RapidAPI free tier. No hard monthly cap here, billed to
+    your Apify account instead -- the actor's own rate is $4.00/1,000 jobs,
+    but the real per-run cost also includes Apify's platform compute charge
+    (memory x runtime), billed separately and previously left at whatever
+    the actor's default build memory is. Now explicitly pinned low
+    (APIFY_RUN_MEMORY_MB, default 256) and hard-capped per run
+    (APIFY_MAX_RUN_USD, default $0.50 -- Apify cuts the run off rather than
+    letting it exceed this, covering platform compute + the actor's own
+    charges combined). Filters to Greenhouse/Lever/Ashby by default since
+    those are the only ATS forms auto_apply.py can currently fill.
     """
     token = cfg("APIFY_TOKEN")
     if not token:
@@ -901,9 +910,13 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     # per query starved almost every one of those downstream filters --
     # this was very likely why real runs kept reporting "no new jobs found"
     # even though the classification logic itself was fine. Configurable via
-    # APIFY_JOB_LIMIT (cost is ~$0.012/job + ~$0.01/run, so 100 is still
-    # well under $1.50/run for a single query).
-    limit = int(cfg("APIFY_JOB_LIMIT") or 100)
+    # APIFY_JOB_LIMIT. Lowered the default from 100 -- a 48h WINDOW_MIN still
+    # has to request Apify's coarser "7d" timeRange bucket (no 48h option
+    # exists; the exact cutoff is enforced afterward by in_window()), so
+    # most raw rows pulled at limit=100 were being discarded by our own
+    # window filter anyway (one real run: 71 pulled, 1 survived the window).
+    # 50 halves that wasted pull while still leaving real headroom.
+    limit = int(cfg("APIFY_JOB_LIMIT") or 50)
     ats_filter = ats if ats is not None else ["greenhouse", "lever.co", "ashby"]
     payload = {
         "timeRange": time_frame,
@@ -915,8 +928,27 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     if ats_filter:
         payload["ats"] = ats_filter
     actor_id = "fantastic-jobs~career-site-job-listing-api"
+    # Two real, separate cost controls Apify's run-sync API exposes that
+    # this call was never actually using -- worth being explicit about
+    # since they were the actual source of the "flat ~$1/run regardless of
+    # results" cost, not the actor's own advertised $4.00/1,000-job price
+    # (71 raw rows should cost well under $0.30 at that rate alone):
+    #   - memory: without this, Apify runs the actor at whatever memory
+    #     tier its default build is configured for, and bills platform
+    #     compute (memory x runtime) ON TOP OF the actor's own per-result
+    #     price -- a real, separate charge this code never controlled.
+    #     The actor's own listing recommends 512MB is enough even for
+    #     larger pulls; we're well under that, so 256MB (the next power of
+    #     2 down -- Apify requires a power of 2, minimum 128) is plenty.
+    #   - maxTotalChargeUsd: a hard ceiling Apify enforces on the ENTIRE
+    #     run's cost (platform compute + the actor's own charges combined)
+    #     -- the run is cut off rather than allowed to exceed it. This is
+    #     the actual guarantee against a surprise bill, independent of
+    #     whatever is driving the cost. Configurable via APIFY_MAX_RUN_USD.
+    run_memory_mb = int(cfg("APIFY_RUN_MEMORY_MB") or 256)
+    max_run_usd = cfg("APIFY_MAX_RUN_USD") or "0.50"
     url = (f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
-           f"?token={token}")
+           f"?token={token}&memory={run_memory_mb}&maxTotalChargeUsd={max_run_usd}")
     try:
         resp, _headers = post_json_with_headers(url, payload)
     except RuntimeError as e:
