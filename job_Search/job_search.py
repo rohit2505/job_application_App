@@ -881,19 +881,29 @@ def _apify_usage_within_budget(token, cap_usd=None):
     return True
 
 
-def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
+def fetch_active_jobs_db_apify(queries, now, window_min, location=None, ats=None):
     """Same fantastic.jobs dataset as fetch_active_jobs_db, but via Apify's
     pay-per-result actor (fantastic-jobs/career-site-job-listing-api)
     instead of the RapidAPI free tier. No hard monthly cap here, billed to
-    your Apify account instead -- the actor's own rate is $4.00/1,000 jobs,
-    but the real per-run cost also includes Apify's platform compute charge
-    (memory x runtime), billed separately and previously left at whatever
-    the actor's default build memory is. Now explicitly pinned low
-    (APIFY_RUN_MEMORY_MB, default 256) and hard-capped per run
-    (APIFY_MAX_RUN_USD, default $0.50 -- Apify cuts the run off rather than
-    letting it exceed this, covering platform compute + the actor's own
-    charges combined). Filters to Greenhouse/Lever/Ashby by default since
-    those are the only ATS forms auto_apply.py can currently fill.
+    your Apify account instead. Real per-run cost also includes Apify's
+    platform compute charge (memory x runtime), billed separately and
+    previously left at whatever the actor's default build memory is. Now
+    explicitly pinned low (APIFY_RUN_MEMORY_MB, default 256) and
+    hard-capped per run (APIFY_MAX_RUN_USD, default $0.50 -- Apify cuts the
+    run off rather than letting it exceed this, covering platform compute +
+    the actor's own charges combined). Filters to Greenhouse/Lever/Ashby by
+    default since those are the only ATS forms auto_apply.py can currently
+    fill.
+
+    `queries` accepts either a single title string or a list of titles --
+    when main() has several comma-separated JOB_QUERY entries (e.g.
+    "data engineer,analytics engineer,etl developer"), ALL of them are sent
+    together in one titleSearch array, so this is ONE paid Apify run
+    regardless of how many titles you're searching, instead of one run per
+    title. main() calls this once with the full title list (outside its
+    normal per-query loop) and then runs post_filter() once per title
+    against the same combined raw results to keep each title's own
+    title-match semantics -- see the call site in main().
     """
     token = cfg("APIFY_TOKEN")
     if not token:
@@ -918,10 +928,15 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     # 50 halves that wasted pull while still leaving real headroom.
     limit = int(cfg("APIFY_JOB_LIMIT") or 50)
     ats_filter = ats if ats is not None else ["greenhouse", "lever.co", "ashby"]
+    # Accept either "data engineer" or ["data engineer", "analytics engineer"].
+    if isinstance(queries, str):
+        title_queries = [queries]
+    else:
+        title_queries = [q.strip() for q in queries if q and q.strip()]
     payload = {
         "timeRange": time_frame,
         "limit": limit,
-        "titleSearch": [query],
+        "titleSearch": title_queries,
         "locationSearch": [location or "United States"],
         "descriptionType": "text",
     }
@@ -949,6 +964,8 @@ def fetch_active_jobs_db_apify(query, now, window_min, location=None, ats=None):
     max_run_usd = cfg("APIFY_MAX_RUN_USD") or "0.50"
     url = (f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
            f"?token={token}&memory={run_memory_mb}&maxTotalChargeUsd={max_run_usd}")
+    print(f"  [activejobsdb_apify] ONE Apify run for {len(title_queries)} "
+          f"title(s): {', '.join(title_queries)}")
     try:
         resp, _headers = post_json_with_headers(url, payload)
     except RuntimeError as e:
@@ -1485,6 +1502,29 @@ def main():
     use = [n for n in enabled if n in valid]
 
     combined = {}
+
+    # activejobsdb_apify is the one paid source here, billed per Apify run
+    # regardless of result count -- pull it ONCE with every JOB_QUERY title
+    # combined into a single titleSearch array, instead of once per title
+    # inside the loop below (that was silently tripling cost on the
+    # script's own 3-title default whenever JOB_QUERY wasn't explicitly
+    # pinned to one term). post_filter() still runs once per title against
+    # this same combined raw result set, so each title's own title-match
+    # filtering behaves exactly as before -- only the paid fetch itself is
+    # deduplicated across titles.
+    if "activejobsdb_apify" in use:
+        apify_jobs = _safe(lambda: fetch_active_jobs_db_apify(
+            queries, now, w, location=args.location), "activejobsdb_apify")
+        for q in queries:
+            qfiltered = post_filter(apify_jobs, args.location, args.remote_only,
+                                    args.exclude_no_sponsorship, None,
+                                    query=q, loose=args.loose, extra_terms=extra_terms,
+                                    min_salary=args.min_salary, require_salary=args.require_salary,
+                                    sponsors=sponsors)
+            for j in qfiltered:
+                combined.setdefault(job_id(j), j)
+        use = [n for n in use if n != "activejobsdb_apify"]
+
     for q in queries:
         runners = runners_for(q)
         qjobs = []

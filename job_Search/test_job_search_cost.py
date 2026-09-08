@@ -57,6 +57,31 @@ class TestApifyCostControls(unittest.TestCase):
         self.assertEqual(result, [])
         mock_post.assert_not_called()
 
+    @patch("job_search._apify_usage_within_budget", return_value=True)
+    @patch("job_search.post_json_with_headers", return_value=([], {}))
+    def test_multiple_titles_sent_in_one_call(self, mock_post, _mock_budget):
+        titles = ["data engineer", "analytics engineer", "etl developer"]
+        js.fetch_active_jobs_db_apify(titles, datetime.now(timezone.utc), 2880)
+        # Exactly one Apify call for all three titles, not three.
+        self.assertEqual(mock_post.call_count, 1)
+        payload = mock_post.call_args[0][1]
+        self.assertEqual(payload["titleSearch"], titles)
+
+    @patch("job_search._apify_usage_within_budget", return_value=True)
+    @patch("job_search.post_json_with_headers", return_value=([], {}))
+    def test_single_string_query_wrapped_as_one_item_list(self, mock_post, _mock_budget):
+        js.fetch_active_jobs_db_apify("data engineer", datetime.now(timezone.utc), 2880)
+        payload = mock_post.call_args[0][1]
+        self.assertEqual(payload["titleSearch"], ["data engineer"])
+
+    @patch("job_search._apify_usage_within_budget", return_value=True)
+    @patch("job_search.post_json_with_headers", return_value=([], {}))
+    def test_blank_titles_in_list_are_dropped(self, mock_post, _mock_budget):
+        js.fetch_active_jobs_db_apify(["data engineer", "", "  ", "etl developer"],
+                                       datetime.now(timezone.utc), 2880)
+        payload = mock_post.call_args[0][1]
+        self.assertEqual(payload["titleSearch"], ["data engineer", "etl developer"])
+
 
 if __name__ == "__main__":
     unittest.main()
